@@ -337,7 +337,8 @@ function createNewPlayer(id, assignedSlot) {
         id: id,
         speedBuff: 0,
         fireBuff: 0,
-        lastShoot: 0
+        lastShoot: 0,
+        maxScore: 0
     };
 }
 
@@ -368,6 +369,7 @@ io.on('connection', (socket) => {
             players[socket.id].grounded = false;
             players[socket.id].invincible = 180; // 3 Seconds Immunity on Join
             players[socket.id].score = 0;
+            players[socket.id].maxScore = 0;
             players[socket.id].speedBuff = 0;
             players[socket.id].fireBuff = 0;
             players[socket.id].lastShoot = 0;
@@ -396,7 +398,7 @@ io.on('connection', (socket) => {
         console.log('User disconnected:', socket.id);
         const p = players[socket.id];
         if (p) {
-            updateHighScores(p.name, p.score); // Save Score
+            updateHighScores(p.name, p.maxScore); // Save Max Score
             const slot = slots.find(s => s.color === p.color);
             if (slot) slot.occupied = false;
         }
@@ -491,7 +493,7 @@ setInterval(() => {
                 if (p.score < 500) {
                     // Game Over
                     io.to(id).emit('game_over', p.score);
-                    updateHighScores(p.name, p.score);
+                    updateHighScores(p.name, p.maxScore); // Save Max Score
                     delete players[id];
 
                     // Release slot
@@ -647,91 +649,93 @@ setInterval(() => {
                 if (p.x < e.x + e.width && p.x + p.width > e.x &&
                     p.y < e.y + e.height && p.y + p.height > e.y) {
 
-                    if (e.state === 'trapped') {
-                        e.state = 'fruit';
-                        p.dy = -5;
-                        p.score += 1000;
+                } else if (e.state === 'trapped') {
+                    e.state = 'fruit';
+                    p.dy = -5;
+                    p.score += 1000;
+                    if (p.score > p.maxScore) p.maxScore = p.score;
 
-                        // Spawn Power-up Chance (20%)
-                        if (Math.random() < 0.2) {
-                            const type = Math.random() < 0.5 ? 'SHOE' : 'CANDY';
-                            items.push({
-                                x: e.x,
-                                y: e.y,
-                                width: 32,
-                                height: 32,
-                                type: type,
-                                id: Date.now()
-                            });
-                        }
+                    // Spawn Power-up Chance (20%)
+                    if (Math.random() < 0.2) {
+                        const type = Math.random() < 0.5 ? 'SHOE' : 'CANDY';
+                        items.push({
+                            x: e.x,
+                            y: e.y,
+                            width: 32,
+                            height: 32,
+                            type: type,
+                            id: Date.now()
+                        });
+                    }
 
-                    } else if (e.state === 'fruit') {
-                        p.score += 500;
-                        // Respawn logic handled by filtering
-                        e.dead = true;
-                    } else if (e.state === 'normal' && p.invincible === 0) {
-                        if (p.score < 500) {
-                            // Game Over
-                            io.to(id).emit('game_over', p.score);
-                            updateHighScores(p.name, p.score);
-                            delete players[id];
+                } else if (e.state === 'fruit') {
+                    p.score += 500;
+                    // Respawn logic handled by filtering
+                    e.dead = true;
+                    if (p.score > p.maxScore) p.maxScore = p.score;
+                } else if (e.state === 'normal' && p.invincible === 0) {
+                    if (p.score < 500) {
+                        // Game Over
+                        io.to(id).emit('game_over', p.score);
+                        updateHighScores(p.name, p.maxScore); // Save Max Score
+                        delete players[id];
 
-                            // Release slot
-                            const slot = slots.find(s => s.color === p.color);
-                            if (slot) slot.occupied = false;
+                        // Release slot
+                        const slot = slots.find(s => s.color === p.color);
+                        if (slot) slot.occupied = false;
 
-                            // Break handled by loop but good to ensure
-                        } else {
-                            // Penalty and Respawn
-                            p.x = 100;
-                            p.y = 100;
-                            p.dy = 0;
-                            p.invincible = 120; // 2 sec
-                            p.score -= 500;
-                        }
+                        // Break handled by loop but good to ensure
+                    } else {
+                        // Penalty and Respawn
+                        p.x = 100;
+                        p.y = 100;
+                        p.dy = 0;
+                        p.invincible = 120; // 2 sec
+                        p.score -= 500;
                     }
                 }
             }
+        }
         });
 
-        // Update Items
-        // Collision with players
-        items = items.filter(item => {
-            let collected = false;
-            for (const id in players) {
-                const p = players[id];
-                if (p.x < item.x + item.width && p.x + p.width > item.x &&
-                    p.y < item.y + item.height && p.y + p.height > item.y) {
+// Update Items
+// Collision with players
+items = items.filter(item => {
+    let collected = false;
+    for (const id in players) {
+        const p = players[id];
+        if (p.x < item.x + item.width && p.x + p.width > item.x &&
+            p.y < item.y + item.height && p.y + p.height > item.y) {
 
-                    collected = true;
-                    io.emit('sound', 'COLLECT'); // Sound Event
-                    if (item.type === 'SHOE') p.speedBuff = 600; // 10s
-                    else if (item.type === 'CANDY') p.fireBuff = 600; // 10s
-                }
-            }
-            return !collected;
-        });
-
-        // Verify Buffer Timers
-        for (const id in players) {
-            const p = players[id];
-            if (p.speedBuff > 0) p.speedBuff--;
-            if (p.fireBuff > 0) p.fireBuff--;
+            collected = true;
+            io.emit('sound', 'COLLECT'); // Sound Event
+            if (item.type === 'SHOE') p.speedBuff = 600; // 10s
+            else if (item.type === 'CANDY') p.fireBuff = 600; // 10s
         }
+    }
+    return !collected;
+});
 
-        // Cleanup Dead Enemies & Respawn
-        const initialCount = enemies.length;
-        enemies = enemies.filter(e => !e.dead);
-        if (enemies.length === 0 && initialCount > 0) {
-            setTimeout(spawnEnemies, 2000);
-        }
+// Verify Buffer Timers
+for (const id in players) {
+    const p = players[id];
+    if (p.speedBuff > 0) p.speedBuff--;
+    if (p.fireBuff > 0) p.fireBuff--;
+}
 
-        // Broadcast State
-        io.emit('state', { players, bubbles, enemies, items, platforms });
+// Cleanup Dead Enemies & Respawn
+const initialCount = enemies.length;
+enemies = enemies.filter(e => !e.dead);
+if (enemies.length === 0 && initialCount > 0) {
+    setTimeout(spawnEnemies, 2000);
+}
+
+// Broadcast State
+io.emit('state', { players, bubbles, enemies, items, platforms });
 
     } catch (err) {
-        console.error('Game Loop Error:', err);
-    }
+    console.error('Game Loop Error:', err);
+}
 }, 1000 / 60);
 
 http.listen(3000, () => {
