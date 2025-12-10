@@ -319,6 +319,28 @@ function updateEnemyAI(enemy) {
 spawnEnemies();
 
 
+// Helper to create new player object
+function createNewPlayer(id, assignedSlot) {
+    return {
+        x: 100,
+        y: 100,
+        width: 32,
+        height: 32,
+        dx: 0,
+        dy: 0,
+        direction: 1,
+        grounded: false,
+        invincible: 0,
+        score: 0,
+        color: assignedSlot.color,
+        characterId: assignedSlot.id,
+        id: id,
+        speedBuff: 0,
+        fireBuff: 0,
+        lastShoot: 0
+    };
+}
+
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
@@ -332,25 +354,7 @@ io.on('connection', (socket) => {
     }
 
     // Create new player
-    // Create new player
-    players[socket.id] = {
-        x: 100,
-        y: 100,
-        width: 32,
-        height: 32,
-        dx: 0,
-        dy: 0,
-        direction: 1,
-        grounded: false,
-        invincible: 0,
-        score: 0,
-        color: assignedSlot.color, // Fixed color from slot
-        characterId: assignedSlot.id,
-        id: socket.id,
-        speedBuff: 0, // Timer
-        fireBuff: 0,  // Timer
-        lastShoot: 0
-    };
+    players[socket.id] = createNewPlayer(socket.id, assignedSlot);
 
     // Wait for 'join_game' to spawn player
     socket.on('join_game', (name) => {
@@ -369,11 +373,15 @@ io.on('connection', (socket) => {
             players[socket.id].lastShoot = 0;
             console.log(`Player ${socket.id} re-joined as ${name}`);
         } else {
-            // Should not happen if connection creates the object, but let's be safe.
-            if (players[socket.id]) {
-                players[socket.id].name = name;
-                players[socket.id].invincible = 180;
-            }
+            // Player object missing (e.g. was deleted on Game Over), recreate it
+            let assignedSlot = slots.find(s => !s.occupied && s.color !== undefined);
+            if (!assignedSlot) assignedSlot = { id: 0, color: '#00dd00' };
+            else assignedSlot.occupied = true;
+
+            players[socket.id] = createNewPlayer(socket.id, assignedSlot);
+            players[socket.id].name = name;
+            players[socket.id].invincible = 180;
+            console.log(`Player ${socket.id} recreated after Game Over as ${name}`);
         }
         // Send initial state immediately
         io.emit('state', { players, bubbles, enemies, items, platforms });
