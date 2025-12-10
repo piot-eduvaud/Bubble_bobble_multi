@@ -264,6 +264,11 @@ playBtn.addEventListener('click', () => {
 
 document.getElementById('quit-btn').addEventListener('click', () => {
     socket.emit('quit_game');
+    // UI Reset
+    document.getElementById('quit-btn').style.display = 'none';
+    loginOverlay.style.display = 'flex';
+    gameoverOverlay.style.display = 'none';
+    highscoreOverlay.style.display = 'none';
 });
 
 // References
@@ -418,6 +423,12 @@ document.addEventListener('keyup', (e) => {
     if (e.code === 'ArrowRight') inputs.right = false;
     if (e.code === 'ArrowUp') inputs.up = false;
     if (e.code === 'Space') inputs.shoot = false;
+
+    // Toggle Pause
+    if (e.code === 'KeyP') {
+        socket.emit('toggle_pause');
+    }
+
     socket.emit('input', inputs);
 });
 
