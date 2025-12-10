@@ -526,9 +526,20 @@ io.on('connection', (socket) => {
     });
 });
 
-// Game Loop (60 FPS)
+// Game Loop (Variable Time Step with Normalization)
+let lastTime = Date.now();
+const TARGET_FPS = 60;
+
 setInterval(() => {
     try {
+        const now = Date.now();
+        const dt = (now - lastTime) / 1000; // Seconds
+        lastTime = now;
+
+        // Cap dt to prevent huge jumps on lag spikes (e.g. max 0.1s)
+        const safeDt = Math.min(dt, 0.1);
+        const timeScale = safeDt * TARGET_FPS; // Normalize to 60 FPS (approx 1.0)
+
         if (gamePaused) {
             // Just emit state so clients handle UI
             io.emit('state', { players, bubbles, enemies, items, platforms, gamePaused });
@@ -540,10 +551,9 @@ setInterval(() => {
             const p = players[id];
             if (!p.isPlaying) continue;
 
-            // Physics
-            // Physics
-            p.dy += GRAVITY;
-            p.y += p.dy;
+            // Physics (apply timeScale)
+            p.dy += GRAVITY * timeScale;
+            p.y += p.dy * timeScale;
 
             // Apply Horizontal Movement based on State
             const currentSpeed = (p.speedBuff > 0) ? 6 : 4;
@@ -555,10 +565,11 @@ setInterval(() => {
                 p.direction = 1;
             } else {
                 // Friction decay ONLY if no input (state)
-                p.dx *= 0.9;
+                // timeScale logic for friction: pow(0.9, timeScale) is better, but simple mult works for small steps
+                p.dx *= Math.pow(0.9, timeScale);
             }
 
-            p.x += p.dx;
+            p.x += p.dx * timeScale;
 
             // Boundaries
             if (p.x < 0) p.x = 0;
@@ -605,8 +616,8 @@ setInterval(() => {
                 // Pit Death
                 if (p.score < 500) {
                     // Game Over
-                    io.to(id).emit('game_over', p.score);
-                    updateHighScores(p.name, p.maxScore); // Save Max Score
+                    const scoreId = updateHighScores(p.name, p.maxScore);
+                    io.to(id).emit('game_over', { score: p.maxScore, id: scoreId });
                     delete players[id];
 
                     // Release slot
