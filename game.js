@@ -108,7 +108,7 @@ function playSound(type) {
 // Assets - Procedurally Generated
 const spriteSheet = document.createElement('canvas');
 spriteSheet.width = 128;
-spriteSheet.height = 32 * 20; // Enough for 15 players + items/enemies
+spriteSheet.height = 32 * 25; // Increased to ensure Row 20 (Candy) is visible
 const spriteCtx = spriteSheet.getContext('2d');
 
 function generateSprites() {
@@ -249,18 +249,42 @@ if (savedName) {
     usernameInput.value = savedName;
 }
 
+
+// Allow Enter key to start
+// Allow Enter key to start (Handled globally now)
+// usernameInput.addEventListener('keyup', ...);
+
 playBtn.addEventListener('click', () => {
     const name = usernameInput.value.trim() || 'Joueur';
     localStorage.setItem('player_name', name);
     loginOverlay.style.display = 'none';
     initAudio();
     socket.emit('join_game', name);
+    document.getElementById('quit-btn').style.display = 'block';
 });
 
-socket.on('game_over', (finalScore) => {
-    alert(`GAME OVER! Score Final: ${finalScore}`);
+document.getElementById('quit-btn').addEventListener('click', () => {
+    socket.emit('quit_game');
+});
+
+socket.on('game_over', (data) => {
+    // Handle object vs legacy number
+    const finalScore = (typeof data === 'object') ? data.score : data;
+    const finalId = (typeof data === 'object') ? data.id : null;
+
+    lastFinalScore = finalScore;
+    lastFinalScoreId = finalId;
+
+    // Re-render to ensure highlight is applied even if highscores arrived first
+    if (lastReceivedScores.length > 0) {
+        renderHighScores(lastReceivedScores);
+    }
+
+    highscoreOverlay.style.display = 'flex'; // Show Scores instead of Alert
+
+    // Also show Login Overlay
     loginOverlay.style.display = 'flex';
-    // Optional: Reset local state if needed
+    document.getElementById('quit-btn').style.display = 'none';
 });
 
 document.addEventListener('keydown', (e) => {
@@ -300,7 +324,9 @@ socket.on('state', (state) => {
     gameState.players = state.players;
     gameState.bubbles = state.bubbles;
     gameState.enemies = state.enemies;
+    gameState.enemies = state.enemies;
     gameState.items = state.items;
+    if (state.items && state.items.length > 0) console.log('Client received items:', state.items.length); // Debug Log
     if (state.platforms) gameState.platforms = state.platforms;
 });
 
@@ -313,6 +339,14 @@ const highscoreOverlay = document.getElementById('highscore-overlay');
 const highscoreList = document.getElementById('highscore-list');
 const highscoreBtn = document.getElementById('highscore-btn');
 
+// Global Enter key for Login
+document.addEventListener('keyup', (e) => {
+    // Use getComputedStyle to check CSS state, not just inline style
+    if (e.key === 'Enter' && window.getComputedStyle(loginOverlay).display !== 'none') {
+        playBtn.click();
+    }
+});
+
 highscoreBtn.addEventListener('click', () => {
     highscoreOverlay.style.display = 'flex';
     socket.emit('request_highscores');
@@ -320,10 +354,20 @@ highscoreBtn.addEventListener('click', () => {
 
 closeHighscoreBtn.addEventListener('click', () => {
     highscoreOverlay.style.display = 'none';
+    if (loginOverlay.style.display === 'flex') {
+        usernameInput.focus();
+    }
 });
 
-socket.on('highscores', (scores) => {
+// Global variable for highlighting
+let lastFinalScore = -1;
+let lastFinalScoreId = null;
+let lastReceivedScores = [];
+
+function renderHighScores(scores) {
     highscoreList.innerHTML = '';
+    const currentPlayerName = localStorage.getItem('player_name');
+
     scores.forEach((s, index) => {
         const li = document.createElement('li');
         li.innerHTML = `
@@ -331,8 +375,26 @@ socket.on('highscores', (scores) => {
             <span class="name">${s.name}</span>
             <span class="score">${s.score}</span>
         `;
+
+        // Check for highlight (Priority to ID, fallback to Name+Score)
+        let isMatch = false;
+        if (lastFinalScoreId && s.id === lastFinalScoreId) {
+            isMatch = true;
+        } else if (!lastFinalScoreId && lastFinalScore !== -1 && s.score === lastFinalScore && s.name === currentPlayerName) {
+            isMatch = true; // Fallback
+        }
+
+        if (isMatch) {
+            li.classList.add('highlight');
+        }
+
         highscoreList.appendChild(li);
     });
+}
+
+socket.on('highscores', (scores) => {
+    lastReceivedScores = scores;
+    renderHighScores(scores);
 });
 
 // Render Loop (Decoupled from network)

@@ -38,12 +38,14 @@ function saveHighScores() {
 }
 
 function updateHighScores(name, score) {
-    if (score < 0) return; // Only ignore negative scores (if any)
-    highScores.push({ name: name || 'Anonymous', score: score, date: new Date().toISOString() });
+    if (score < 0) return null;
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 5); // Unique ID
+    highScores.push({ id: id, name: name || 'Anonymous', score: score, date: new Date().toISOString() });
     highScores.sort((a, b) => b.score - a.score);
     highScores = highScores.slice(0, 50); // Keep Top 50
     saveHighScores();
     io.emit('highscores', highScores); // Broadcast update
+    return id;
 }
 
 // Initial Load
@@ -52,7 +54,7 @@ loadHighScores();
 // Game Constants
 const GRAVITY = 0.5;
 const FRICTION = 0.8;
-const JUMP_STRENGTH = -16;
+const JUMP_STRENGTH = -18;
 const SPEED = 5;
 const BUBBLE_SPEED = 6;
 const CANVAS_WIDTH = 800;
@@ -60,7 +62,7 @@ const CANVAS_HEIGHT = 600;
 
 // Game State
 const players = {};
-const bubbles = [];
+let bubbles = [];
 let enemies = [];
 let items = []; // Power-ups
 let lastEnemySpawn = 0;
@@ -132,6 +134,17 @@ function spawnEnemies() {
         currentMapIndex = (currentMapIndex + 1) % MAPS.length;
         platforms = MAPS[currentMapIndex];
         console.log(`Map switched to Type ${currentMapIndex}`);
+
+        // Safe Teleport for all players on Map Switch
+        for (const id in players) {
+            const p = players[id];
+            if (p.isPlaying) {
+                p.x = 100;
+                p.y = 100; // Reset to top-left safe zone
+                p.dy = 0;
+                p.dx = 0;
+            }
+        }
     }
 
     // Boss Wave (Every 10 waves)
@@ -267,6 +280,11 @@ function updateEnemyAI(enemy) {
                 if (target.x > enemy.x + 10) enemy.direction = 1;
                 else if (target.x < enemy.x - 10) enemy.direction = -1;
 
+                // Fairness: If falling and close, move AWAY (don't land on head)
+                if (!enemy.grounded && enemy.dy > 0 && Math.abs(target.x - enemy.x) < 64) {
+                    enemy.direction = (target.x > enemy.x) ? -1 : 1;
+                }
+
                 enemy.dx = enemy.direction * CHASE_SPEED;
 
                 // Vertical Logic (Jump)
@@ -338,7 +356,9 @@ function createNewPlayer(id, assignedSlot) {
         speedBuff: 0,
         fireBuff: 0,
         lastShoot: 0,
-        maxScore: 0
+        lastShoot: 0,
+        maxScore: 0,
+        isPlaying: false
     };
 }
 
@@ -386,6 +406,7 @@ io.on('connection', (socket) => {
             console.log(`Player ${socket.id} recreated after Game Over as ${name}`);
         }
         // Send initial state immediately
+        players[socket.id].isPlaying = true;
         io.emit('state', { players, bubbles, enemies, items, platforms });
         socket.emit('highscores', highScores); // Send scores on join
     });
@@ -394,20 +415,38 @@ io.on('connection', (socket) => {
         socket.emit('highscores', highScores);
     });
 
-    socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
+    socket.on('quit_game', () => {
         const p = players[socket.id];
         if (p) {
-            updateHighScores(p.name, p.maxScore); // Save Max Score
+            updateHighScores(p.name, p.score); // Save current Score
+            io.to(socket.id).emit('game_over', p.score); // Tell client
+
+            // Release slot
             const slot = slots.find(s => s.color === p.color);
             if (slot) slot.occupied = false;
         }
         delete players[socket.id];
+        io.emit('state', { players, bubbles, enemies, items, platforms });
+    });
 
-        // Reset Game if Empty
-        if (Object.keys(players).length === 0) {
-            console.log('All players disconnected. Resetting game.');
-            resetGame();
+    socket.on('disconnect', () => {
+        try {
+            console.log('User disconnected:', socket.id);
+            const p = players[socket.id];
+            if (p) {
+                updateHighScores(p.name, p.maxScore); // Save Max Score
+                const slot = slots.find(s => s.color === p.color);
+                if (slot) slot.occupied = false;
+            }
+            delete players[socket.id];
+
+            // Reset Game if Empty
+            if (Object.keys(players).length === 0) {
+                console.log('All players disconnected. Resetting game.');
+                resetGame();
+            }
+        } catch (err) {
+            console.error('Error in disconnect handler:', err);
         }
     });
 
@@ -428,7 +467,7 @@ io.on('connection', (socket) => {
         }
 
         if (input.up && player.grounded) {
-            player.dy = -14; // Jump Strength Adjusted
+            player.dy = -16; // Jump Strength Adjusted
             player.grounded = false;
         }
 
@@ -459,6 +498,7 @@ setInterval(() => {
         // Update Players
         for (const id in players) {
             const p = players[id];
+            if (!p.isPlaying) continue;
 
             // Physics
             p.dy += GRAVITY;
@@ -646,96 +686,106 @@ setInterval(() => {
             // Collision with Players
             for (const id in players) {
                 const p = players[id];
+                if (!p.isPlaying) continue;
                 if (p.x < e.x + e.width && p.x + p.width > e.x &&
                     p.y < e.y + e.height && p.y + p.height > e.y) {
 
-                } else if (e.state === 'trapped') {
-                    e.state = 'fruit';
-                    p.dy = -5;
-                    p.score += 1000;
-                    if (p.score > p.maxScore) p.maxScore = p.score;
+                    if (e.state === 'trapped') {
+                        console.log('TRAPPED HIT! Spawning forced.'); // Debug Log
+                        e.state = 'fruit';
+                        p.dy = -5;
+                        p.score += 1000;
+                        if (p.score > p.maxScore) p.maxScore = p.score;
 
-                    // Spawn Power-up Chance (20%)
-                    if (Math.random() < 0.2) {
-                        const type = Math.random() < 0.5 ? 'SHOE' : 'CANDY';
-                        items.push({
-                            x: e.x,
-                            y: e.y,
-                            width: 32,
-                            height: 32,
-                            type: type,
-                            id: Date.now()
-                        });
-                    }
+                        // Spawn Power-up Chance (50%)
+                        if (Math.random() < 0.5) {
+                            // Grace Period: Item cannot be collected for 1 second (so player sees it)
+                            const type = Math.random() < 0.5 ? 'SHOE' : 'CANDY';
+                            const now = Date.now();
+                            items.push({
+                                x: e.x,
+                                y: e.y,
+                                width: 32,
+                                height: 32,
+                                type: type,
+                                id: now,
+                                spawnTime: now
+                            });
+                        }
 
-                } else if (e.state === 'fruit') {
-                    p.score += 500;
-                    // Respawn logic handled by filtering
-                    e.dead = true;
-                    if (p.score > p.maxScore) p.maxScore = p.score;
-                } else if (e.state === 'normal' && p.invincible === 0) {
-                    if (p.score < 500) {
-                        // Game Over
-                        io.to(id).emit('game_over', p.score);
-                        updateHighScores(p.name, p.maxScore); // Save Max Score
-                        delete players[id];
+                    } else if (e.state === 'fruit') {
+                        p.score += 500;
+                        // Respawn logic handled by filtering
+                        e.dead = true;
+                        if (p.score > p.maxScore) p.maxScore = p.score;
+                    } else if (e.state === 'normal' && p.invincible === 0) {
+                        if (p.score < 500) {
+                            // Game Over
+                            const scoreId = updateHighScores(p.name, p.maxScore); // Save Max Score and get ID
+                            io.to(id).emit('game_over', { score: p.maxScore, id: scoreId }); // Send Object with ID
+                            delete players[id];
 
-                        // Release slot
-                        const slot = slots.find(s => s.color === p.color);
-                        if (slot) slot.occupied = false;
+                            // Release slot
+                            const slot = slots.find(s => s.color === p.color);
+                            if (slot) slot.occupied = false;
 
-                        // Break handled by loop but good to ensure
-                    } else {
-                        // Penalty and Respawn
-                        p.x = 100;
-                        p.y = 100;
-                        p.dy = 0;
-                        p.invincible = 120; // 2 sec
-                        p.score -= 500;
+                            // Break handled by loop but good to ensure
+                        } else {
+                            // Penalty and Respawn
+                            p.x = 100;
+                            p.y = 100;
+                            p.dy = 0;
+                            p.invincible = 120; // 2 sec
+                            p.score -= 500;
+                            io.emit('sound', 'BOSS_HIT'); // Sound
+                        }
                     }
                 }
             }
-        }
         });
 
-// Update Items
-// Collision with players
-items = items.filter(item => {
-    let collected = false;
-    for (const id in players) {
-        const p = players[id];
-        if (p.x < item.x + item.width && p.x + p.width > item.x &&
-            p.y < item.y + item.height && p.y + p.height > item.y) {
+        // Update Items
+        // Collision with players
+        items = items.filter(item => {
+            // Grace Period (1s) to allow visual confirmation
+            if (item.spawnTime && Date.now() - item.spawnTime < 1000) return true;
 
-            collected = true;
-            io.emit('sound', 'COLLECT'); // Sound Event
-            if (item.type === 'SHOE') p.speedBuff = 600; // 10s
-            else if (item.type === 'CANDY') p.fireBuff = 600; // 10s
+            let collected = false;
+            for (const id in players) {
+                const p = players[id];
+                if (!p.isPlaying) continue;
+                if (p.x < item.x + item.width && p.x + p.width > item.x &&
+                    p.y < item.y + item.height && p.y + p.height > item.y) {
+
+                    collected = true;
+                    io.emit('sound', 'COLLECT'); // Sound Event
+                    if (item.type === 'SHOE') p.speedBuff = 600; // 10s
+                    else if (item.type === 'CANDY') p.fireBuff = 600; // 10s
+                }
+            }
+            return !collected;
+        });
+
+        // Verify Buffer Timers
+        for (const id in players) {
+            const p = players[id];
+            if (p.speedBuff > 0) p.speedBuff--;
+            if (p.fireBuff > 0) p.fireBuff--;
         }
-    }
-    return !collected;
-});
 
-// Verify Buffer Timers
-for (const id in players) {
-    const p = players[id];
-    if (p.speedBuff > 0) p.speedBuff--;
-    if (p.fireBuff > 0) p.fireBuff--;
-}
+        // Cleanup Dead Enemies & Respawn
+        const initialCount = enemies.length;
+        enemies = enemies.filter(e => !e.dead);
+        if (enemies.length === 0 && initialCount > 0) {
+            setTimeout(spawnEnemies, 2000);
+        }
 
-// Cleanup Dead Enemies & Respawn
-const initialCount = enemies.length;
-enemies = enemies.filter(e => !e.dead);
-if (enemies.length === 0 && initialCount > 0) {
-    setTimeout(spawnEnemies, 2000);
-}
-
-// Broadcast State
-io.emit('state', { players, bubbles, enemies, items, platforms });
+        // Broadcast State
+        io.emit('state', { players, bubbles, enemies, items, platforms });
 
     } catch (err) {
-    console.error('Game Loop Error:', err);
-}
+        console.error('Game Loop Error:', err);
+    }
 }, 1000 / 60);
 
 http.listen(3000, () => {

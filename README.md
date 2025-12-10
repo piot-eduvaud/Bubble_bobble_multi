@@ -2,7 +2,7 @@
 
 A real-time multiplayer arcade platformer inspired by the classic Bubble Bobble. Built with Node.js, Socket.io, and HTML5 Canvas.
 
-![Game Screenshot](https://raw.githubusercontent.com/piot-eduvaud/Bubble_bobble_multi/screenshot.png) *(Note: Add a screenshot to your repo named screenshot.png to make this appear!)*
+![Game Screenshot](screenshot.png)
 
 ## 🎮 Features
 - **Multiplayer**: Play with friends in real-time.

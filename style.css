@@ -161,3 +161,17 @@ canvas {
 #close-highscore-btn:hover {
     background: #666;
 }
+
+#quit-btn {
+    font-family: 'Courier New', Courier, monospace;
+    z-index: 1000;
+}
+
+.highlight {
+    background-color: #ffd700;
+    /* Gold */
+    color: black;
+    font-weight: bold;
+    border-radius: 4px;
+    padding: 0 5px;
+}
