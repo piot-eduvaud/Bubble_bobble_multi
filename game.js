@@ -242,6 +242,7 @@ const inputs = {
 const loginOverlay = document.getElementById('login-overlay');
 const usernameInput = document.getElementById('username');
 const playBtn = document.getElementById('play-btn');
+const speedInput = document.getElementById('game-speed');
 
 // Load saved name
 const savedName = localStorage.getItem('player_name');
@@ -253,10 +254,11 @@ if (savedName) {
 
 playBtn.addEventListener('click', () => {
     const name = usernameInput.value.trim() || 'Joueur';
+    const speed = speedInput.value;
     localStorage.setItem('player_name', name);
     loginOverlay.style.display = 'none';
     initAudio();
-    socket.emit('join_game', name);
+    socket.emit('join_game', { name, speed });
     document.getElementById('quit-btn').style.display = 'block';
 });
 

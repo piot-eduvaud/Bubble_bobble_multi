@@ -345,7 +345,14 @@ io.on('connection', (socket) => {
     players[socket.id] = createNewPlayer(socket.id, assignedSlot);
 
     // Wait for 'join_game' to spawn player
-    socket.on('join_game', (name) => {
+    socket.on('join_game', (data) => {
+        // Handle migration from old client (sending string string) vs new (sending object)
+        const name = (typeof data === 'object') ? data.name : data;
+        const speed = (typeof data === 'object') ? data.speed : 'slow';
+
+        // Update Game Speed based on preference (Last player wins logic for MVP)
+        setGameSpeed(speed);
+
         // If player already exists (e.g., re-joining), update name and reset position
         if (players[socket.id]) {
             players[socket.id].name = name;
@@ -478,10 +485,21 @@ function resetGame() {
 
 
 // FIXED TIMESTEP GAME LOOP
-const TICK_RATE = 60;
-const FIXED_STEP = 1000 / TICK_RATE; // ~16.66ms
+let TICK_RATE = 30; // Default Slow (Gen X)
+let FIXED_STEP = 1000 / TICK_RATE;
 let lastTime = Date.now();
 let accumulator = 0;
+
+function setGameSpeed(speed) {
+    if (speed === 'fast') {
+        TICK_RATE = 60;
+        console.log('Game Speed set to FAST (60 FPS) - Gen Z Mode');
+    } else {
+        TICK_RATE = 30;
+        console.log('Game Speed set to NORMAL (30 FPS) - Gen X Mode');
+    }
+    FIXED_STEP = 1000 / TICK_RATE;
+}
 
 setInterval(() => {
     try {
@@ -505,7 +523,7 @@ setInterval(() => {
     } catch (err) {
         console.error('Error in game loop:', err);
     }
-}, 1000 / TICK_RATE); // Wake up every 16ms approx
+}, 1000 / 60); // Wake up every 16ms to support up to 60fps logic
 
 function updatePhysics() {
     if (gamePaused) return;

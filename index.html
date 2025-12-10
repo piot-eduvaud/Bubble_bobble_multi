@@ -13,6 +13,13 @@
         <div class="login-box">
             <h1>Net Booble</h1>
             <input type="text" id="username" placeholder="Entrez votre pseudo" maxlength="10">
+            <div style="margin: 10px 0;">
+                <label style="color:white; display:block; margin-bottom:5px;">Vitesse du Jeu :</label>
+                <select id="game-speed" style="padding: 10px; font-size: 1rem; width: 100%;">
+                    <option value="slow" selected>Gen X (Normal - 30 FPS)</option>
+                    <option value="fast">Gen Z (Rapide - 60 FPS)</option>
+                </select>
+            </div>
             <button id="play-btn">JOUER</button>
             <button id="highscore-btn" style="margin-top:20px; background:#00dddd;">🏆 SCORES</button>
         </div>
