@@ -105,6 +105,19 @@ let currentMapIndex = 0;
 let platforms = MAPS[0];
 
 // Initialize Enemies (Wave System)
+// Reset Game State
+function resetGame() {
+    waveCount = 0;
+    enemies = [];
+    bubbles = [];
+    items = [];
+    currentMapIndex = 0;
+    platforms = MAPS[0];
+    slots.forEach(s => s.occupied = false);
+    spawnEnemies();
+    io.emit('state', { players, bubbles, enemies, items, platforms });
+}
+
 // Initialize Enemies (Wave System)
 function spawnEnemies() {
     waveCount++;
@@ -345,11 +358,11 @@ io.on('connection', (socket) => {
         if (players[socket.id]) {
             players[socket.id].name = name;
             players[socket.id].x = 100;
-            players[socket.id].y = CANVAS_HEIGHT - 100;
+            players[socket.id].y = 100; // Spawn high (safer)
             players[socket.id].dx = 0;
             players[socket.id].dy = 0;
             players[socket.id].grounded = false;
-            players[socket.id].invincible = 0;
+            players[socket.id].invincible = 180; // 3 Seconds Immunity on Join
             players[socket.id].score = 0;
             players[socket.id].speedBuff = 0;
             players[socket.id].fireBuff = 0;
@@ -357,11 +370,9 @@ io.on('connection', (socket) => {
             console.log(`Player ${socket.id} re-joined as ${name}`);
         } else {
             // Should not happen if connection creates the object, but let's be safe.
-            // Actually, my previous edit removed the initial creation in favor of waiting.
-            // But the connection block creates it using 'assignedSlot'.
-            // So players[socket.id] SHOULD exist.
             if (players[socket.id]) {
                 players[socket.id].name = name;
+                players[socket.id].invincible = 180;
             }
         }
         // Send initial state immediately
