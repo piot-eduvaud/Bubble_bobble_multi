@@ -1,0 +1,163 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background: #111;
+    color: white;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+canvas {
+    display: block;
+    margin: 0 auto;
+    background: #000;
+}
+
+#ui-layer {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    pointer-events: none;
+    width: 800px;
+}
+
+#scoreboard {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    border: 2px solid #fff;
+    pointer-events: none;
+    font-size: 14px;
+    text-align: left;
+}
+
+/* Login Overlay */
+#login-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+.login-box {
+    background: #222;
+    padding: 2rem;
+    border: 4px solid #fff;
+    text-align: center;
+}
+
+.login-box h1 {
+    color: #0f0;
+    margin-bottom: 2rem;
+    text-shadow: 2px 2px #f0f;
+}
+
+.login-box input {
+    display: block;
+    margin: 0 auto 1rem auto;
+    padding: 10px;
+    font-size: 1.2rem;
+    font-family: inherit;
+    background: #000;
+    color: #fff;
+    border: 2px solid #666;
+    text-align: center;
+}
+
+.login-box button {
+    padding: 10px 30px;
+    font-size: 1.5rem;
+    font-family: inherit;
+    background: #f0f;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    box-shadow: 4px 4px #fff;
+}
+
+.login-box button:hover {
+    background: #fff;
+    color: #f0f;
+    box-shadow: 4px 4px #f0f;
+}
+
+/* High Score Overlay */
+#highscore-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+}
+
+.highscore-box {
+    background: #111;
+    padding: 2rem;
+    border: 4px solid #ffd700;
+    text-align: center;
+    width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.highscore-box h1 {
+    color: #ffd700;
+    text-shadow: 2px 2px #000;
+}
+
+.highscore-box ul {
+    list-style: none;
+    padding: 0;
+    text-align: left;
+}
+
+.highscore-box li {
+    padding: 5px;
+    border-bottom: 1px solid #333;
+    font-size: 1.1rem;
+    display: flex;
+    justify-content: space-between;
+}
+
+.highscore-box li span.rank {
+    color: #888;
+    width: 30px;
+}
+
+.highscore-box li span.name {
+    color: #fff;
+    flex: 1;
+    text-align: left;
+    padding-left: 10px;
+}
+
+.highscore-box li span.score {
+    color: #0f0;
+}
+
+#close-highscore-btn {
+    margin-top: 20px;
+    padding: 10px 20px;
+    background: #444;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+}
+
+#close-highscore-btn:hover {
+    background: #666;
+}

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bubble Bobble Clone</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="login-overlay">
+        <div class="login-box">
+            <h1>Bubble Bobble</h1>
+            <input type="text" id="username" placeholder="Entrez votre pseudo" maxlength="10">
+            <button id="play-btn">JOUER</button>
+            <button id="highscore-btn" style="margin-top:20px; background:#00dddd;">🏆 SCORES</button>
+        </div>
+    </div>
+
+    <div id="highscore-overlay" style="display:none;">
+        <div class="highscore-box">
+            <h1>🏆 TOP 50 🏆</h1>
+            <ul id="highscore-list"></ul>
+            <button id="close-highscore-btn">FERMER</button>
+        </div>
+    </div>
+
+    <div id="scoreboard"></div>
+    <div id="game-container">
+        <h1>Bubble Dragon Online</h1>
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <p id="controls-hint">CONTRÔLES : FLÈCHES + ESPACE</p>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game.js"></script>
+</body>
+
+</html>
