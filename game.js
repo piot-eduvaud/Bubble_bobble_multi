@@ -267,20 +267,32 @@ document.getElementById('quit-btn').addEventListener('click', () => {
     socket.emit('quit_game');
 });
 
+// References
+const gameoverOverlay = document.getElementById('gameover-overlay');
+const finalScoreDisplay = document.getElementById('final-score-display');
+
 socket.on('game_over', (data) => {
-    // Handle object vs legacy number
     const finalScore = (typeof data === 'object') ? data.score : data;
     const finalId = (typeof data === 'object') ? data.id : null;
 
     lastFinalScore = finalScore;
     lastFinalScoreId = finalId;
 
-    // Re-render to ensure highlight is applied even if highscores arrived first
-    if (lastReceivedScores.length > 0) {
-        renderHighScores(lastReceivedScores);
-    }
+    // Show Game Over Dialog
+    gameoverOverlay.style.display = 'flex';
+    finalScoreDisplay.textContent = `SCORE: ${finalScore}`;
 
-    highscoreOverlay.style.display = 'flex'; // Show Scores instead of Alert
+    // Transition to High Scores after 3 seconds
+    setTimeout(() => {
+        gameoverOverlay.style.display = 'none';
+        highscoreOverlay.style.display = 'flex';
+        socket.emit('request_highscores');
+
+        // Re-render highlight if we have data
+        if (lastReceivedScores.length > 0) {
+            renderHighScores(lastReceivedScores);
+        }
+    }, 3000);
 
     // Also show Login Overlay
     loginOverlay.style.display = 'flex';
@@ -305,6 +317,13 @@ document.addEventListener('keydown', (e) => {
         if (!e.repeat) playSound('SHOOT');
         inputs.shoot = false;
         setTimeout(() => socket.emit('input', inputs), 50);
+    }
+});
+
+// Pause Toggle
+document.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'p') {
+        socket.emit('toggle_pause');
     }
 });
 
@@ -442,6 +461,15 @@ function render() {
         ctx.arc(p.x + 16, p.y - 10, 5, 0, Math.PI * 2);
         ctx.fill();
 
+        // Draw Lives (Local Player Only)
+        if (id === socket.id) {
+            if (p.lives) {
+                for (let i = 0; i < p.lives; i++) {
+                    ctx.drawImage(spriteSheet, 96, 512, 32, 32, 800 - 40 - (i * 35), 10, 32, 32);
+                }
+            }
+        }
+
         // Score display handling moved to shared scoreboard below
     }
 
@@ -540,6 +568,16 @@ function render() {
         });
     }
 
+    if (gameState.gamePaused) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = 'white';
+        ctx.font = '40px "Press Start 2P"';
+        ctx.textAlign = 'center';
+        ctx.fillText('PAUSE', canvas.width / 2, canvas.height / 2);
+        ctx.textAlign = 'left'; // Reset
+    }
     requestAnimationFrame(render);
 }
 

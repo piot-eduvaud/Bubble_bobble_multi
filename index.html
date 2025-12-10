@@ -4,17 +4,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bubble Bobble Clone</title>
+    <title>Net Booble</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
     <div id="login-overlay">
         <div class="login-box">
-            <h1>Bubble Bobble</h1>
+            <h1>Net Booble</h1>
             <input type="text" id="username" placeholder="Entrez votre pseudo" maxlength="10">
             <button id="play-btn">JOUER</button>
             <button id="highscore-btn" style="margin-top:20px; background:#00dddd;">🏆 SCORES</button>
+        </div>
+    </div>
+
+    <div id="gameover-overlay" style="display:none;">
+        <div class="gameover-box">
+            <h1>GAME OVER</h1>
+            <p id="final-score-display">SCORE: 0</p>
         </div>
     </div>
 
@@ -28,7 +35,7 @@
 
     <div id="scoreboard"></div>
     <div id="game-container">
-        <h1>Bubble Dragon Online</h1>
+        <h1>Net Booble</h1>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <p id="controls-hint">CONTRÔLES : FLÈCHES + ESPACE</p>
         <button id="quit-btn"

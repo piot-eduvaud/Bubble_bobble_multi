@@ -59,14 +59,16 @@ const SPEED = 5;
 const BUBBLE_SPEED = 6;
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
+const MAX_ENEMIES = 10; // Max enemies on screen
 
 // Game State
 const players = {};
+let gamePaused = false; // Global Pause State
 let bubbles = [];
 let enemies = [];
 let items = []; // Power-ups
 let lastEnemySpawn = 0;
-let waveCount = 0;
+let waveCount = 1;
 
 // Player Slots (Fixed Colors - 15 Variants)
 const colors = [
@@ -152,6 +154,17 @@ function spawnEnemies() {
 
     if (isBossWave) {
         console.log(`Spawning BOSS Wave ${waveCount}`);
+        // ... skipping to lines 726 ...
+        // Increment Kill Counter
+        p.enemiesKilled++;
+        if (p.enemiesKilled % 5 === 0) {
+            p.lives++; // Extra Life every 5 kills
+        }
+        // ... skipping to lines 748 ...
+        // Boss Bonus Logic
+        if (e.type === 'boss') {
+            p.lives += 3; // +3 lives for Boss
+        }
         // Spawn 1 Boss
         enemies.push({
             x: 400 - 32, // Center
@@ -358,7 +371,9 @@ function createNewPlayer(id, assignedSlot) {
         lastShoot: 0,
         lastShoot: 0,
         maxScore: 0,
-        isPlaying: false
+        isPlaying: false,
+        lives: 5, // Start with 5 lives
+        enemiesKilled: 0
     };
 }
 
@@ -393,6 +408,8 @@ io.on('connection', (socket) => {
             players[socket.id].speedBuff = 0;
             players[socket.id].fireBuff = 0;
             players[socket.id].lastShoot = 0;
+            players[socket.id].lives = 5; // Reset Lives
+            players[socket.id].enemiesKilled = 0;
             console.log(`Player ${socket.id} re-joined as ${name}`);
         } else {
             // Player object missing (e.g. was deleted on Game Over), recreate it
@@ -426,7 +443,11 @@ io.on('connection', (socket) => {
             if (slot) slot.occupied = false;
         }
         delete players[socket.id];
-        io.emit('state', { players, bubbles, enemies, items, platforms });
+        if (Object.keys(players).length === 0) {
+            console.log('All players disconnected. Resetting game.');
+            resetGame();
+        }
+        io.emit('state', { players, bubbles, enemies, items, platforms, gamePaused });
     });
 
     socket.on('disconnect', () => {
@@ -448,6 +469,21 @@ io.on('connection', (socket) => {
         } catch (err) {
             console.error('Error in disconnect handler:', err);
         }
+    });
+
+    socket.on('quit_game', () => {
+        const p = players[socket.id];
+        if (p) {
+            io.to(socket.id).emit('game_over', { score: p.maxScore }); // Or just confirm quit
+            // updateHighScores(p.name, p.score); // Already handled in disconnect/gameover?
+            // Actually quit just resets player to 'isPlaying: false' or removes them?
+            // Current client implementation reloads page on quit.
+        }
+    });
+
+    socket.on('toggle_pause', () => {
+        gamePaused = !gamePaused;
+        console.log(`Game Paused: ${gamePaused}`);
     });
 
     socket.on('input', (input) => {
@@ -495,6 +531,12 @@ io.on('connection', (socket) => {
 // Game Loop (60 FPS)
 setInterval(() => {
     try {
+        if (gamePaused) {
+            // Just emit state so clients handle UI
+            io.emit('state', { players, bubbles, enemies, items, platforms, gamePaused });
+            return;
+        }
+
         // Update Players
         for (const id in players) {
             const p = players[id];
@@ -511,6 +553,27 @@ setInterval(() => {
             // Boundaries
             if (p.x < 0) p.x = 0;
             if (p.x + p.width > CANVAS_WIDTH) p.x = CANVAS_WIDTH - p.width;
+
+            // Pit Fall (Bottom of screen)
+            if (p.y > CANVAS_HEIGHT) {
+                p.lives--;
+                if (p.lives <= 0) {
+                    // Game Over
+                    const scoreId = updateHighScores(p.name, p.maxScore);
+                    io.to(id).emit('game_over', { score: p.maxScore, id: scoreId });
+                    delete players[id];
+
+                    const slot = slots.find(s => s.color === p.color);
+                    if (slot) slot.occupied = false;
+                } else {
+                    // Respawn
+                    p.x = 100;
+                    p.y = 100;
+                    p.dy = 0;
+                    // Optional: Sound or Invincibility?
+                    // p.invincible = 60; 
+                }
+            }
 
             // Platforms
             p.grounded = false;
@@ -583,7 +646,7 @@ setInterval(() => {
 
                         if (e.hp <= 0) {
                             e.state = 'fruit';
-                            e.dead = true;
+                            // e.dead = true; // REMOVED: Allow player to collect "Boss Fruit" for +3 Lives
                             io.emit('sound', 'BOSS_DIE'); // Sound Event
 
                             // Spawn massive loot
@@ -697,6 +760,12 @@ setInterval(() => {
                         p.score += 1000;
                         if (p.score > p.maxScore) p.maxScore = p.score;
 
+                        // Increment Kill Counter
+                        p.enemiesKilled++;
+                        if (p.enemiesKilled % 5 === 0) {
+                            p.lives++; // Extra Life every 5 kills
+                        }
+
                         // Spawn Power-up Chance (50%)
                         if (Math.random() < 0.5) {
                             // Grace Period: Item cannot be collected for 1 second (so player sees it)
@@ -715,11 +784,18 @@ setInterval(() => {
 
                     } else if (e.state === 'fruit') {
                         p.score += 500;
+                        // Boss Bonus Logic
+                        if (e.type === 'boss') {
+                            p.lives += 3; // +3 lives for Boss
+                            console.log(`[TEST] BOSS KILLED! +3 Lives. Total: ${p.lives}`);
+                        }
+
                         // Respawn logic handled by filtering
                         e.dead = true;
                         if (p.score > p.maxScore) p.maxScore = p.score;
                     } else if (e.state === 'normal' && p.invincible === 0) {
-                        if (p.score < 500) {
+                        p.lives--; // Lose a life
+                        if (p.lives <= 0) {
                             // Game Over
                             const scoreId = updateHighScores(p.name, p.maxScore); // Save Max Score and get ID
                             io.to(id).emit('game_over', { score: p.maxScore, id: scoreId }); // Send Object with ID
@@ -728,16 +804,13 @@ setInterval(() => {
                             // Release slot
                             const slot = slots.find(s => s.color === p.color);
                             if (slot) slot.occupied = false;
-
-                            // Break handled by loop but good to ensure
                         } else {
-                            // Penalty and Respawn
+                            // Respawn (Lose Life)
                             p.x = 100;
                             p.y = 100;
                             p.dy = 0;
                             p.invincible = 120; // 2 sec
-                            p.score -= 500;
-                            io.emit('sound', 'BOSS_HIT'); // Sound
+                            io.emit('sound', 'BOSS_HIT'); // Sound (Hit sound)
                         }
                     }
                 }
