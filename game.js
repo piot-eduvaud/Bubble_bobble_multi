@@ -249,10 +249,7 @@ if (savedName) {
     usernameInput.value = savedName;
 }
 
-
-// Allow Enter key to start
-// Allow Enter key to start (Handled globally now)
-// usernameInput.addEventListener('keyup', ...);
+// Global Enter key for Login is handled below
 
 playBtn.addEventListener('click', () => {
     const name = usernameInput.value.trim() || 'Joueur';
@@ -300,7 +297,6 @@ socket.on('game_over', (data) => {
 });
 
 document.addEventListener('keydown', (e) => {
-    // Audio Context is init on click now, but backup here just in case
     initAudio();
 
     if (e.code === 'ArrowLeft') inputs.left = true;
@@ -326,6 +322,94 @@ document.addEventListener('keydown', (e) => {
         socket.emit('toggle_pause');
     }
 });
+
+// Touch Controls (Mobile)
+const joystickZone = document.getElementById('joystick-zone');
+const joystickUI = document.getElementById('joystick-ui');
+const joystickKnob = document.querySelector('.joystick-knob');
+let joystickActive = false;
+let startX, startY;
+const JOYSTICK_MAX_RADIUS = 40;
+
+if (joystickZone) {
+    // Shared Logic
+    const handleStart = (clientX, clientY) => {
+        joystickActive = true;
+        startX = clientX;
+        startY = clientY;
+
+        joystickUI.style.display = 'block';
+        joystickUI.style.left = `${startX}px`;
+        joystickUI.style.top = `${startY}px`;
+        joystickKnob.style.transform = `translate(-50%, -50%)`;
+
+        // Attach global listeners for robust tracking (fixes stutter)
+        window.addEventListener('mousemove', onGlobalMove);
+        window.addEventListener('mouseup', onGlobalEnd);
+        window.addEventListener('touchmove', onGlobalTouchMove, { passive: false });
+        window.addEventListener('touchend', onGlobalEnd, { passive: false });
+    };
+
+    const handleMove = (clientX, clientY) => {
+        if (!joystickActive) return;
+
+        let dx = clientX - startX;
+        let dy = clientY - startY;
+
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance > JOYSTICK_MAX_RADIUS) {
+            const angle = Math.atan2(dy, dx);
+            dx = Math.cos(angle) * JOYSTICK_MAX_RADIUS;
+            dy = Math.sin(angle) * JOYSTICK_MAX_RADIUS;
+        }
+
+        joystickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+
+        inputs.left = (dx < -10);
+        inputs.right = (dx > 10);
+        inputs.up = (dy < -30); // Jump if dragged up
+
+        socket.emit('input', inputs);
+    };
+
+    const handleEnd = () => {
+        joystickActive = false;
+        joystickUI.style.display = 'none';
+        inputs.left = false;
+        inputs.right = false;
+        inputs.up = false;
+        socket.emit('input', inputs);
+
+        // Remove global listeners
+        window.removeEventListener('mousemove', onGlobalMove);
+        window.removeEventListener('mouseup', onGlobalEnd);
+        window.removeEventListener('touchmove', onGlobalTouchMove);
+        window.removeEventListener('touchend', onGlobalEnd);
+    };
+
+    // Global wrappers
+    const onGlobalMove = (e) => handleMove(e.clientX, e.clientY);
+    const onGlobalTouchMove = (e) => { e.preventDefault(); handleMove(e.changedTouches[0].clientX, e.changedTouches[0].clientY); };
+    const onGlobalEnd = (e) => handleEnd();
+
+    // Start Listeners on Zone
+    joystickZone.addEventListener('mousedown', (e) => { e.preventDefault(); handleStart(e.clientX, e.clientY); });
+    joystickZone.addEventListener('touchstart', (e) => { e.preventDefault(); handleStart(e.changedTouches[0].clientX, e.changedTouches[0].clientY); }, { passive: false });
+}
+
+// Right Zone (Fire)
+const fireZone = document.getElementById('fire-zone');
+if (fireZone) {
+    const startFire = (e) => { e.preventDefault(); inputs.shoot = true; socket.emit('input', inputs); };
+    const endFire = (e) => { e.preventDefault(); inputs.shoot = false; socket.emit('input', inputs); };
+
+    // Mouse
+    fireZone.addEventListener('mousedown', startFire);
+    fireZone.addEventListener('mouseup', endFire);
+    // Touch
+    fireZone.addEventListener('touchstart', startFire, { passive: false });
+    fireZone.addEventListener('touchend', endFire, { passive: false });
+}
 
 document.addEventListener('keyup', (e) => {
     if (e.code === 'ArrowLeft') inputs.left = false;
@@ -489,7 +573,6 @@ function render() {
         scoreY += 15;
     });
 
-    // Draw Enemies
     // Draw Enemies
     gameState.enemies.forEach(e => {
         let row = 15; // Default Chaser

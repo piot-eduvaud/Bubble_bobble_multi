@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Net Booble</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -41,6 +41,22 @@
         <button id="quit-btn"
             style="position: absolute; top: 10px; right: 10px; background: red; color: white; border: 2px solid white; padding: 5px 10px; cursor: pointer; display: none;">QUITTER</button>
     </div>
+
+    <!-- Mobile Controls (Moved to Root) -->
+    <div id="mobile-controls">
+        <!-- Left Zone for Joystick (Move + Jump) -->
+        <div id="joystick-zone"></div>
+
+        <!-- Joystick UI (Hidden by default) -->
+        <div id="joystick-ui">
+            <div class="joystick-base"></div>
+            <div class="joystick-knob"></div>
+        </div>
+
+        <!-- Right Zone: Tap to Shoot -->
+        <div id="fire-zone"></div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
 </body>

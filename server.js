@@ -373,7 +373,9 @@ function createNewPlayer(id, assignedSlot) {
         maxScore: 0,
         isPlaying: false,
         lives: 5, // Start with 5 lives
-        enemiesKilled: 0
+        lives: 5, // Start with 5 lives
+        enemiesKilled: 0,
+        inputs: { left: false, right: false, up: false, shoot: false }
     };
 }
 
@@ -488,25 +490,21 @@ io.on('connection', (socket) => {
 
     socket.on('input', (input) => {
         const player = players[socket.id];
-        if (!player) return; // Ignore if not joined yet
+        if (!player) return;
 
-        const currentSpeed = (player.speedBuff > 0) ? 6 : 4; // SPEED 4 or 6
+        // Update Persistent Input State
+        player.inputs = input;
 
-        if (input.left) {
-            player.dx = -currentSpeed;
-            player.direction = -1;
-        } else if (input.right) {
-            player.dx = currentSpeed;
-            player.direction = 1;
-        } else {
-            player.dx = 0;
-        }
-
+        // Handle Jump (Instant Impulse)
         if (input.up && player.grounded) {
-            player.dy = -16; // Jump Strength Adjusted
+            player.dy = -16;
             player.grounded = false;
         }
 
+        // Handle Shoot (Pulse) - logic handled in Update Loop or here? 
+        // Keeping it here is fine for now, but better in loop for auto-fire? 
+        // User asked for tap-to-shoot, so inputs.shoot stays persistent?
+        // Let's keep existing Shoot logic here for now, it uses cooldown.
         if (input.shoot) {
             const now = Date.now();
             const cooldown = (player.fireBuff > 0) ? 200 : 500;
@@ -543,12 +541,24 @@ setInterval(() => {
             if (!p.isPlaying) continue;
 
             // Physics
+            // Physics
             p.dy += GRAVITY;
             p.y += p.dy;
-            p.x += p.dx;
 
-            // Friction decay if no input (simplified)
-            p.dx *= 0.9;
+            // Apply Horizontal Movement based on State
+            const currentSpeed = (p.speedBuff > 0) ? 6 : 4;
+            if (p.inputs && p.inputs.left) {
+                p.dx = -currentSpeed;
+                p.direction = -1;
+            } else if (p.inputs && p.inputs.right) {
+                p.dx = currentSpeed;
+                p.direction = 1;
+            } else {
+                // Friction decay ONLY if no input (state)
+                p.dx *= 0.9;
+            }
+
+            p.x += p.dx;
 
             // Boundaries
             if (p.x < 0) p.x = 0;
