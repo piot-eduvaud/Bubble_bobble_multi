@@ -604,7 +604,12 @@ setInterval(() => {
                     p.y < platform.y + platform.height &&
                     p.y + p.height > platform.y) {
 
-                    if (p.dy > 0 && p.y + p.height - p.dy <= platform.y) {
+                    // Check if we were previously above the platform
+                    // We must use (dy * timeScale) because that's how much we moved
+                    const prevBottom = (p.y + p.height) - (p.dy * timeScale);
+
+                    // Add a small threshold (e.g. 5px) to be generous with "just above"
+                    if (p.dy >= 0 && prevBottom <= platform.y + 10) {
                         p.grounded = true;
                         p.dy = 0;
                         p.y = platform.y - p.height;
