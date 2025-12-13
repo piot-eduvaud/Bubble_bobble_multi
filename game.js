@@ -160,10 +160,10 @@ function generateSprites() {
         drawChar(i, color, false);
     });
 
-    // Enemy (Row 15 - Chaser)
-    drawChar(15, '#dd00dd', true);
-    // Enemy (Row 18 - Fearful)
-    drawChar(18, '#00ffff', true);
+    // Enemy (Row 15 - Chaser) - Dark Purple (Distinct from Player Magenta)
+    drawChar(15, '#7a007a', true);
+    // Enemy (Row 18 - Fearful) - Dark Teal (Distinct from Player Cyan)
+    drawChar(18, '#007a7a', true);
 
     // Power-ups
     // Shoe (Row 19)
@@ -552,11 +552,40 @@ function render() {
         );
         ctx.restore();
 
-        // Draw Tint for ID (Simple circle above head to identify P1/P2)
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x + 16, p.y - 10, 5, 0, Math.PI * 2);
-        ctx.fill();
+        // Draw Player Identity (Nicknames & Highlight)
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.font = '10px "Press Start 2P"'; // Pixel font
+
+        // 1. Draw Name
+        // Stroke for readability
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 3;
+        ctx.strokeText(p.name || 'P' + ((p.characterId || 0) + 1), p.x + 16, p.y - 15);
+
+        // Fill based on ID
+        ctx.fillStyle = 'white';
+        ctx.fillText(p.name || 'P' + ((p.characterId || 0) + 1), p.x + 16, p.y - 15);
+
+        // 2. Highlight Local Player (You)
+        if (id === socket.id) {
+            ctx.strokeStyle = '#ffd700'; // Gold
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            // Pulse effect
+            const pulse = (Math.sin(Date.now() / 200) + 1) * 2;
+            ctx.arc(p.x + 16, p.y + 16, 20 + pulse, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Small arrow indicator above name
+            ctx.fillStyle = '#ffd700';
+            ctx.beginPath();
+            ctx.moveTo(p.x + 16, p.y - 25);
+            ctx.lineTo(p.x + 11, p.y - 32);
+            ctx.lineTo(p.x + 21, p.y - 32);
+            ctx.fill();
+        }
+        ctx.restore();
 
         // Draw Lives (Local Player Only)
         if (id === socket.id) {
@@ -596,7 +625,28 @@ function render() {
         // Better: let's simply assume Row 15 is fine, but we scale it.
 
         let col = 0;
-        if (e.state === 'normal') {
+
+        if (e.state === 'spawning') {
+            // Draw Spawning Portal / Warning
+            ctx.save();
+            ctx.translate(e.x + 16, e.y + 16);
+            const scale = Math.abs(Math.sin(Date.now() / 100)) * 0.5 + 0.5;
+            ctx.scale(scale, scale);
+
+            ctx.strokeStyle = '#ff00ff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, 16, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.fillStyle = 'white';
+            ctx.font = '12px "Press Start 2P"';
+            ctx.textAlign = 'center';
+            ctx.fillText('!', 0, 5);
+
+            ctx.restore();
+            return; // Skip normal render
+        } else if (e.state === 'normal') {
             col = (Date.now() % 400 > 200) ? 1 : 2;
         } else if (e.state === 'trapped') {
             col = 3;

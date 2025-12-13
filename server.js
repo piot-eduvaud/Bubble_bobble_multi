@@ -183,7 +183,8 @@ function spawnEnemies() {
                 dx: dir * baseSpeed,
                 dy: 0,
                 direction: dir,
-                state: 'normal',
+                state: 'spawning', // Start in spawning state
+                spawnTimer: 60 + (i * 30), // Staggered spawn (Warning time)
                 type: type, // 'chaser' or 'fearful'
                 panicTimer: 0,
                 trappedTime: 0,
@@ -215,6 +216,16 @@ function updateEnemyAI(enemy) {
             minDist = dist;
             target = p;
         }
+    }
+
+    // Spawning State Logic
+    if (enemy.state === 'spawning') {
+        if (enemy.spawnTimer > 0) {
+            enemy.spawnTimer--;
+        } else {
+            enemy.state = 'normal'; // Activate
+        }
+        return; // Skip AI movement
     }
 
     // State Transitions
@@ -647,6 +658,12 @@ function updatePhysics() {
 
     // Update Enemies
     enemies.forEach(e => {
+        if (e.state === 'spawning') {
+            updateEnemyAI(e); // Process timer
+            // No physics/gravity/collision for spawning enemies
+            return;
+        }
+
         if (e.state === 'normal') {
             updateEnemyAI(e);
 
