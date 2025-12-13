@@ -440,10 +440,15 @@ socket.on('state', (state) => {
     gameState.players = state.players;
     gameState.bubbles = state.bubbles;
     gameState.enemies = state.enemies;
-    gameState.enemies = state.enemies;
     gameState.items = state.items;
+    gameState.gamePaused = state.gamePaused; // Sync pause state
     if (state.items && state.items.length > 0) console.log('Client received items:', state.items.length); // Debug Log
-    if (state.platforms) gameState.platforms = state.platforms;
+});
+
+// Separate Map Update Listener (Performance Optimization)
+socket.on('map_update', (platforms) => {
+    gameState.platforms = platforms;
+    console.log('Map updated, platforms received:', platforms.length);
 });
 
 socket.on('sound', (type) => {
@@ -585,6 +590,17 @@ function render() {
             ctx.lineTo(p.x + 21, p.y - 32);
             ctx.fill();
         }
+        // 3. Draw Shield
+        if (p.shield > 0) {
+            ctx.strokeStyle = '#00ffff'; // Cyan Shield
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(p.x + 16, p.y + 16, 22 + Math.sin(Date.now() / 100) * 2, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
+            ctx.fill();
+        }
+
         ctx.restore();
 
         // Draw Lives (Local Player Only)
@@ -707,6 +723,11 @@ function render() {
             let row = 0;
             if (i.type === 'SHOE') row = 19;
             else if (i.type === 'CANDY') row = 20;
+            else if (i.type === 'SHIELD') {
+                // Draw Shield Icon (Custom drawing instead of sprite for now, or Row 16 Item)
+                // Use Item Row 16, Item circle
+                row = 16;
+            }
 
             // Bobbing animation
             const yOffset = Math.sin(Date.now() / 200) * 3;

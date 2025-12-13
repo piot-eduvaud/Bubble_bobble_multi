@@ -117,82 +117,85 @@ function spawnEnemies() {
     const count = 3 + Math.floor(waveCount / 2); // Start 3, +1 every 2 waves
     const baseSpeed = 2 + (waveCount * 0.2); // Start 2.2, +0.2 per wave (Smoother)
 
-    // Map Evolution (Every 3 waves)
-    if (waveCount % 3 === 0) {
-        currentMapIndex = (currentMapIndex + 1) % MAPS.length;
-        platforms = MAPS[currentMapIndex];
-        console.log(`Map switched to Type ${currentMapIndex}`);
+}
 
-        // Safe Teleport for all players on Map Switch
-        for (const id in players) {
-            const p = players[id];
-            p.x = 100;
-            p.y = 100;
-            p.dy = 0;
-        }
+// Map Evolution (Every 3 waves)
+if (waveCount % 3 === 0) {
+    currentMapIndex = (currentMapIndex + 1) % MAPS.length;
+    platforms = MAPS[currentMapIndex];
+    console.log(`Map switched to Type ${currentMapIndex}`);
+    io.emit('map_update', platforms); // Notify clients of new map
+
+    // Safe Teleport for all players on Map Switch
+    for (const id in players) {
+        const p = players[id];
+        p.x = 100;
+        p.y = 100;
+        p.dy = 0;
     }
+}
 
-    // Boss Wave (Every 10 waves)
-    const isBossWave = (waveCount % 10 === 0);
+// Boss Wave (Every 10 waves)
+const isBossWave = (waveCount % 10 === 0);
 
-    if (isBossWave) {
-        console.log(`Spawning BOSS Wave ${waveCount}`);
-        // Spawn 1 Boss
+if (isBossWave) {
+    console.log(`Spawning BOSS Wave ${waveCount}`);
+    // Spawn 1 Boss
+    enemies.push({
+        x: 400 - 32, // Center
+        y: 100,
+        width: 64,  // Big
+        height: 64, // Big
+        dx: (Math.random() < 0.5 ? 1 : -1) * (baseSpeed * 0.8), // Slightly slower
+        dy: 0,
+        direction: 1,
+        state: 'normal',
+        type: 'boss',
+        hp: 20,
+        maxHp: 20,
+        panicTimer: 0,
+        trappedTime: 0,
+        id: Date.now()
+    });
+    // Add minimal minions
+    for (let i = 0; i < 2; i++) {
         enemies.push({
-            x: 400 - 32, // Center
+            x: Math.random() * (CANVAS_WIDTH - 100) + 50,
             y: 100,
-            width: 64,  // Big
-            height: 64, // Big
-            dx: (Math.random() < 0.5 ? 1 : -1) * (baseSpeed * 0.8), // Slightly slower
+            width: 32,
+            height: 32,
+            dx: (Math.random() < 0.5 ? 1 : -1) * baseSpeed,
             dy: 0,
             direction: 1,
             state: 'normal',
-            type: 'boss',
-            hp: 20,
-            maxHp: 20,
+            type: 'chaser',
+            id: Date.now() + i + 1
+        });
+    }
+} else {
+    console.log(`Spawning Wave ${waveCount}: ${count} enemies, Speed ${baseSpeed.toFixed(1)}`);
+
+    for (let i = 0; i < count; i++) {
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        const type = Math.random() < 0.5 ? 'chaser' : 'fearful';
+        enemies.push({
+            x: Math.random() * (CANVAS_WIDTH - 100) + 50,
+            y: 100,
+            width: 32,
+            height: 32,
+            dx: dir * baseSpeed,
+            dy: 0,
+            direction: dir,
+            state: 'spawning', // Start in spawning state
+            spawnTimer: 60 + (i * 30), // Staggered spawn (Warning time)
+            type: type, // 'chaser' or 'fearful'
             panicTimer: 0,
             trappedTime: 0,
-            id: Date.now()
+            id: Date.now() + i
         });
-        // Add minimal minions
-        for (let i = 0; i < 2; i++) {
-            enemies.push({
-                x: Math.random() * (CANVAS_WIDTH - 100) + 50,
-                y: 100,
-                width: 32,
-                height: 32,
-                dx: (Math.random() < 0.5 ? 1 : -1) * baseSpeed,
-                dy: 0,
-                direction: 1,
-                state: 'normal',
-                type: 'chaser',
-                id: Date.now() + i + 1
-            });
-        }
-    } else {
-        console.log(`Spawning Wave ${waveCount}: ${count} enemies, Speed ${baseSpeed.toFixed(1)}`);
-
-        for (let i = 0; i < count; i++) {
-            const dir = Math.random() < 0.5 ? 1 : -1;
-            const type = Math.random() < 0.5 ? 'chaser' : 'fearful';
-            enemies.push({
-                x: Math.random() * (CANVAS_WIDTH - 100) + 50,
-                y: 100,
-                width: 32,
-                height: 32,
-                dx: dir * baseSpeed,
-                dy: 0,
-                direction: dir,
-                state: 'spawning', // Start in spawning state
-                spawnTimer: 60 + (i * 30), // Staggered spawn (Warning time)
-                type: type, // 'chaser' or 'fearful'
-                panicTimer: 0,
-                trappedTime: 0,
-                id: Date.now() + i
-            });
-        }
     }
 }
+
 // Enemy AI Logic
 function updateEnemyAI(enemy) {
     if (!enemy.aiState) enemy.aiState = 'PATROL';
@@ -335,6 +338,7 @@ function createNewPlayer(id, assignedSlot) {
         maxScore: 0,
         isPlaying: false,
         lives: 5, // Start with 5 lives
+        shield: 0, // Shield count
         enemiesKilled: 0,
         inputs: { left: false, right: false, up: false, shoot: false }
     };
@@ -395,7 +399,11 @@ io.on('connection', (socket) => {
         }
         // Send initial state immediately
         players[socket.id].isPlaying = true;
-        io.emit('state', { players, bubbles, enemies, items, platforms });
+
+        // Optimize: Send map separately first
+        socket.emit('map_update', platforms);
+
+        io.emit('state', { players, bubbles, enemies, items }); // Removed platforms
         socket.emit('highscores', highScores); // Send scores on join
     });
 
@@ -529,7 +537,7 @@ setInterval(() => {
         }
 
         if (!gamePaused) {
-            io.emit('state', { players, bubbles, enemies, items, platforms, gamePaused });
+            io.emit('state', { players, bubbles, enemies, items, gamePaused }); // Removed platforms from hot loop
         }
     } catch (err) {
         console.error('Error in game loop:', err);
@@ -635,7 +643,9 @@ function updatePhysics() {
                                 y: e.y + Math.random() * 40,
                                 width: 32,
                                 height: 32,
-                                type: Math.random() > 0.5 ? 'SHOE' : 'CANDY',
+                                width: 32,
+                                height: 32,
+                                type: Math.random() > 0.3 ? (Math.random() > 0.5 ? 'SHOE' : 'CANDY') : 'SHIELD', // 30% chance for Shield
                                 id: Date.now() + k
                             });
                         }
@@ -732,7 +742,7 @@ function updatePhysics() {
                     if (Math.random() < 0.5) {
                         items.push({
                             x: e.x, y: e.y, width: 32, height: 32,
-                            type: Math.random() < 0.5 ? 'SHOE' : 'CANDY',
+                            type: Math.random() > 0.3 ? (Math.random() > 0.5 ? 'SHOE' : 'CANDY') : 'SHIELD',
                             id: Date.now(), spawnTime: Date.now()
                         });
                     }
@@ -743,16 +753,22 @@ function updatePhysics() {
                     e.dead = true;
                     if (p.score > p.maxScore) p.maxScore = p.score;
                 } else if (e.state === 'normal' && p.invincible === 0) {
-                    p.lives--;
-                    if (p.lives <= 0) {
-                        const scoreId = updateHighScores(p.name, p.maxScore);
-                        io.to(id).emit('game_over', { score: p.maxScore, id: scoreId });
-                        delete players[id];
-                        const slot = slots.find(s => s.color === p.color);
-                        if (slot) slot.occupied = false;
+                    if (p.shield > 0) {
+                        p.shield--;
+                        p.invincible = 120; // Brief immunity after shield break
+                        io.emit('sound', 'POP'); // Shield break sound
                     } else {
-                        p.x = 100; p.y = 100; p.dy = 0; p.invincible = 120;
-                        io.emit('sound', 'BOSS_HIT');
+                        p.lives--;
+                        if (p.lives <= 0) {
+                            const scoreId = updateHighScores(p.name, p.maxScore);
+                            io.to(id).emit('game_over', { score: p.maxScore, id: scoreId });
+                            delete players[id];
+                            const slot = slots.find(s => s.color === p.color);
+                            if (slot) slot.occupied = false;
+                        } else {
+                            p.x = 100; p.y = 100; p.dy = 0; p.invincible = 120;
+                            io.emit('sound', 'BOSS_HIT');
+                        }
                     }
                 }
             }
@@ -773,6 +789,7 @@ function updatePhysics() {
                 io.emit('sound', 'COLLECT');
                 if (item.type === 'SHOE') p.speedBuff = 600;
                 else if (item.type === 'CANDY') p.fireBuff = 600;
+                else if (item.type === 'SHIELD') p.shield = (p.shield || 0) + 1;
             }
         }
         return !collected;
