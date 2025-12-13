@@ -41,6 +41,7 @@ canvas {
     left: 0;
     width: 100%;
     height: 100%;
+    height: 100dvh;
     background: rgba(0, 0, 0, 0.9);
     display: flex;
     justify-content: center;
@@ -98,6 +99,7 @@ canvas {
     left: 0;
     width: 100%;
     height: 100%;
+    height: 100dvh;
     background: rgba(0, 0, 0, 0.95);
     display: flex;
     justify-content: center;
@@ -167,6 +169,7 @@ canvas {
     left: 0;
     width: 100%;
     height: 100%;
+    height: 100dvh;
     background: rgba(0, 0, 0, 0.9);
     display: flex;
     justify-content: center;
@@ -206,6 +209,7 @@ canvas {
     left: 0;
     width: 100%;
     height: 100%;
+    height: 100dvh;
     pointer-events: none;
     /* Let clicks pass through empty space */
     z-index: 1000;
@@ -308,6 +312,12 @@ canvas {
     /* Core Aspect Ratio Logic */
     width: min(100vw, calc(100vh * 4 / 3));
     height: min(100vh, calc(100vw * 3 / 4));
+    /* Fallback for browsers that don't support dvh */
+
+    /* Modern Mobile Fix using Dynamic Viewport Height */
+    width: min(100vw, calc(100dvh * 4 / 3));
+    height: min(100dvh, calc(100vw * 3 / 4));
+
     margin: auto;
 
     /* Flex to center canvas if container slightly mismatches (though math above prevents it) */
@@ -353,6 +363,7 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
+    min-height: 100dvh;
     background: #111;
 }
 
