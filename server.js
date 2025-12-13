@@ -117,82 +117,83 @@ function spawnEnemies() {
     const count = 3 + Math.floor(waveCount / 2); // Start 3, +1 every 2 waves
     const baseSpeed = 2 + (waveCount * 0.2); // Start 2.2, +0.2 per wave (Smoother)
 
-}
 
-// Map Evolution (Every 3 waves)
-if (waveCount % 3 === 0) {
-    currentMapIndex = (currentMapIndex + 1) % MAPS.length;
-    platforms = MAPS[currentMapIndex];
-    console.log(`Map switched to Type ${currentMapIndex}`);
-    io.emit('map_update', platforms); // Notify clients of new map
 
-    // Safe Teleport for all players on Map Switch
-    for (const id in players) {
-        const p = players[id];
-        p.x = 100;
-        p.y = 100;
-        p.dy = 0;
+    // Map Evolution (Every 3 waves)
+    if (waveCount % 3 === 0) {
+        currentMapIndex = (currentMapIndex + 1) % MAPS.length;
+        platforms = MAPS[currentMapIndex];
+        console.log(`Map switched to Type ${currentMapIndex}`);
+        io.emit('map_update', platforms); // Notify clients of new map
+
+        // Safe Teleport for all players on Map Switch
+        for (const id in players) {
+            const p = players[id];
+            p.x = 100;
+            p.y = 100;
+            p.dy = 0;
+        }
     }
-}
 
-// Boss Wave (Every 10 waves)
-const isBossWave = (waveCount % 10 === 0);
+    // Boss Wave (Every 10 waves)
+    const isBossWave = (waveCount % 10 === 0);
 
-if (isBossWave) {
-    console.log(`Spawning BOSS Wave ${waveCount}`);
-    // Spawn 1 Boss
-    enemies.push({
-        x: 400 - 32, // Center
-        y: 100,
-        width: 64,  // Big
-        height: 64, // Big
-        dx: (Math.random() < 0.5 ? 1 : -1) * (baseSpeed * 0.8), // Slightly slower
-        dy: 0,
-        direction: 1,
-        state: 'normal',
-        type: 'boss',
-        hp: 20,
-        maxHp: 20,
-        panicTimer: 0,
-        trappedTime: 0,
-        id: Date.now()
-    });
-    // Add minimal minions
-    for (let i = 0; i < 2; i++) {
+    if (isBossWave) {
+        console.log(`Spawning BOSS Wave ${waveCount}`);
+        // Spawn 1 Boss
         enemies.push({
-            x: Math.random() * (CANVAS_WIDTH - 100) + 50,
+            x: 400 - 32, // Center
             y: 100,
-            width: 32,
-            height: 32,
-            dx: (Math.random() < 0.5 ? 1 : -1) * baseSpeed,
+            width: 64,  // Big
+            height: 64, // Big
+            dx: (Math.random() < 0.5 ? 1 : -1) * (baseSpeed * 0.8), // Slightly slower
             dy: 0,
             direction: 1,
             state: 'normal',
-            type: 'chaser',
-            id: Date.now() + i + 1
-        });
-    }
-} else {
-    console.log(`Spawning Wave ${waveCount}: ${count} enemies, Speed ${baseSpeed.toFixed(1)}`);
-
-    for (let i = 0; i < count; i++) {
-        const dir = Math.random() < 0.5 ? 1 : -1;
-        const type = Math.random() < 0.5 ? 'chaser' : 'fearful';
-        enemies.push({
-            x: Math.random() * (CANVAS_WIDTH - 100) + 50,
-            y: 100,
-            width: 32,
-            height: 32,
-            dx: dir * baseSpeed,
-            dy: 0,
-            direction: dir,
-            state: 'spawning', // Start in spawning state
-            spawnTimer: 60 + (i * 30), // Staggered spawn (Warning time)
-            type: type, // 'chaser' or 'fearful'
+            type: 'boss',
+            hp: 20,
+            maxHp: 20,
             panicTimer: 0,
             trappedTime: 0,
-            id: Date.now() + i
+            id: Date.now()
         });
+        // Add minimal minions
+        for (let i = 0; i < 2; i++) {
+            enemies.push({
+                x: Math.random() * (CANVAS_WIDTH - 100) + 50,
+                y: 100,
+                width: 32,
+                height: 32,
+                dx: (Math.random() < 0.5 ? 1 : -1) * baseSpeed,
+                dy: 0,
+                direction: 1,
+                state: 'normal',
+                type: 'chaser',
+                id: Date.now() + i + 1
+            });
+        }
+    } else {
+        console.log(`Spawning Wave ${waveCount}: ${count} enemies, Speed ${baseSpeed.toFixed(1)}`);
+
+        for (let i = 0; i < count; i++) {
+            const dir = Math.random() < 0.5 ? 1 : -1;
+            const type = Math.random() < 0.5 ? 'chaser' : 'fearful';
+            enemies.push({
+                x: Math.random() * (CANVAS_WIDTH - 100) + 50,
+                y: 100,
+                width: 32,
+                height: 32,
+                dx: dir * baseSpeed,
+                dy: 0,
+                direction: dir,
+                state: 'spawning', // Start in spawning state
+                spawnTimer: 60 + (i * 30), // Staggered spawn (Warning time)
+                type: type, // 'chaser' or 'fearful'
+                panicTimer: 0,
+                trappedTime: 0,
+                id: Date.now() + i
+            });
+        }
     }
 }
 
