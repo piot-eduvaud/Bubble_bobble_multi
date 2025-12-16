@@ -181,10 +181,11 @@ class GameRoom {
     addPlayer(socketId, playerName) {
         let assignedSlot = this.slots.find(s => !s.occupied);
         if (!assignedSlot) {
-            assignedSlot = { id: 0, color: '#00dd00' };
-        } else {
-            assignedSlot.occupied = true;
+            // Should not happen due to Max Players check, but safety first
+            console.error(`Room ${this.name} has no slots available!`);
+            return null;
         }
+        assignedSlot.occupied = true;
 
         const newPlayer = {
             room: this.name,
@@ -724,6 +725,10 @@ io.on('connection', (socket) => {
 
         // Add Player
         const player = currentRoom.addPlayer(socket.id, name);
+        if (!player) {
+            socket.emit('join_error', 'Impossible de rejoindre : aucun emplacement disponible (erreur interne).');
+            return;
+        }
         console.log(`Player ${name} joined room ${roomName} (${currentRoom.mode})`);
 
         broadcastRoomList(); // Player Count Update
