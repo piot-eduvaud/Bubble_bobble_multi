@@ -20,6 +20,21 @@
         <div class="login-box">
             <h1>Net Booble</h1>
             <input type="text" id="username" placeholder="Entrez votre pseudo" maxlength="10">
+            <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px;">
+                <input type="text" id="room-name" placeholder="Nom de la Salle" maxlength="15" value="Arcade"
+                    style="flex: 1; margin: 0;">
+                <label style="color: white; font-size: 0.8rem; display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="room-private" style="width: auto; margin-right: 5px;"> Privée
+                </label>
+            </div>
+            <div style="margin: 10px 0;">
+                <label style="color:white; display:block; margin-bottom:5px;">Mode de Jeu :</label>
+                <select id="game-mode" style="padding: 10px; font-size: 1rem; width: 100%;">
+                    <option value="COOP" selected>Co-op (Classique)</option>
+                    <option value="PVP">Battle Royale (PvP)</option>
+                    <option value="PVPVE">Chaos (PvP + Ennemis)</option>
+                </select>
+            </div>
             <div style="margin: 10px 0;">
                 <label style="color:white; display:block; margin-bottom:5px;">Vitesse du Jeu :</label>
                 <select id="game-speed" style="padding: 10px; font-size: 1rem; width: 100%;">
@@ -29,6 +44,17 @@
             </div>
             <button id="play-btn">JOUER</button>
             <button id="highscore-btn" style="margin-top:20px; background:#00dddd;">🏆 SCORES</button>
+
+            <!-- Active Public Rooms List -->
+            <div id="room-list-container" style="margin-top: 20px; text-align: left; width: 100%;">
+                <h3 style="color:white; font-size: 1rem; border-bottom: 1px solid #555; padding-bottom: 5px;">Salles
+                    Publiques</h3>
+                <ul id="room-list"
+                    style="list-style: none; padding: 0; max-height: 150px; overflow-y: auto; color: white; font-size: 0.8rem;">
+                    <!-- Rooms will be inserted here -->
+                    <li style="padding: 5px; color: #888;">Chargement...</li>
+                </ul>
+            </div>
         </div>
     </div>
 

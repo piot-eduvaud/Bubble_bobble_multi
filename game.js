@@ -241,8 +241,12 @@ const inputs = {
 // Login Logic
 const loginOverlay = document.getElementById('login-overlay');
 const usernameInput = document.getElementById('username');
+const roomInput = document.getElementById('room-name');
+const privateCheck = document.getElementById('room-private');
 const playBtn = document.getElementById('play-btn');
 const speedInput = document.getElementById('game-speed');
+const modeInput = document.getElementById('game-mode');
+const roomListUl = document.getElementById('room-list');
 
 // Load saved name
 const savedName = localStorage.getItem('player_name');
@@ -254,13 +258,46 @@ if (savedName) {
 
 playBtn.addEventListener('click', () => {
     const name = usernameInput.value.trim() || 'Joueur';
+    const room = roomInput.value.trim() || 'Arcade';
+    const isPrivate = privateCheck.checked;
     const speed = speedInput.value;
+    const mode = modeInput.value;
     localStorage.setItem('player_name', name);
     loginOverlay.style.display = 'none';
     initAudio();
-    socket.emit('join_game', { name, speed });
+    socket.emit('join_game', { name, room, speed, mode, isPrivate });
     document.getElementById('quit-btn').style.display = 'block';
 });
+
+// Room List Logic
+socket.on('room_list', (rooms) => {
+    if (!roomListUl) return;
+    roomListUl.innerHTML = '';
+    if (rooms.length === 0) {
+        roomListUl.innerHTML = '<li style="padding: 5px; color: #888;">Aucune salle publique.</li>';
+        return;
+    }
+
+    rooms.forEach(r => {
+        const li = document.createElement('li');
+        li.style.cssText = 'padding: 8px; cursor: pointer; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center;';
+        li.innerHTML = `
+            <span><strong>${r.name}</strong> <span style="font-size:0.7em; color:#aaa;">(${r.mode})</span></span>
+            <span style="background: #333; padding: 2px 5px; border-radius: 4px;">${r.players} 👤</span>
+        `;
+        li.addEventListener('mouseenter', () => li.style.background = '#333');
+        li.addEventListener('mouseleave', () => li.style.background = 'transparent');
+        li.addEventListener('click', () => {
+            roomInput.value = r.name;
+            modeInput.value = r.mode; // Optional: Auto-select mode? Or let them join and override?
+            // Highlight
+            roomInput.style.borderColor = '#0f0';
+            setTimeout(() => roomInput.style.borderColor = '', 500);
+        });
+        roomListUl.appendChild(li);
+    });
+});
+
 
 document.getElementById('quit-btn').addEventListener('click', () => {
     socket.emit('quit_game');
@@ -538,24 +575,21 @@ function render() {
         const p = gameState.players[id];
         if (p.invincible > 0 && p.invincible % 4 > 2) continue; // Blink
 
-        // Sprite selection based on movement
-        let col = 0; // Idle
-        if (!p.grounded) col = 3; // Jump
-        else if (Math.abs(p.dx) > 0.1) col = (Date.now() % 200 > 100) ? 1 : 2; // Walk
+        // Check for Trapped State
+        if (p.state === 'trapped') {
+            // Draw Player Spiraling (Trapped)
+            ctx.save();
+            ctx.translate(p.x + 16, p.y + 16);
+            ctx.rotate(Date.now() / 200); // Spin
+            ctx.drawImage(spriteSheet, 3 * 32, 15 * 32, 32, 32, -16, -16, 32, 32); // Use Trapped Sprite (same as enemy for now or generic)
+            ctx.restore();
 
-        // Determine Row based on CharacterId (Server Slot)
-        const row = typeof p.characterId !== 'undefined' ? p.characterId : 0;
+            // Draw Bubble Overlay
+            ctx.drawImage(spriteSheet, 0, 16 * 32, 32, 32, p.x, p.y, 32, 32); // Bubble
 
-        ctx.save();
-        ctx.translate(p.x + (p.direction === -1 ? p.width : 0), p.y);
-        ctx.scale(p.direction, 1);
-
-        ctx.drawImage(
-            spriteSheet,
-            col * 32, row * 32, 32, 32, // Source
-            0, 0, 32, 32
-        );
-        ctx.restore();
+            // Skip normal drawing
+            continue;
+        }
 
         // Draw Player Identity (Nicknames & Highlight)
         ctx.save();
@@ -601,6 +635,25 @@ function render() {
             ctx.fill();
         }
 
+        ctx.restore();
+
+        // Sprite selection based on movement
+        let col = 0; // Idle
+        if (!p.grounded) col = 3; // Jump
+        else if (Math.abs(p.dx) > 0.1) col = (Date.now() % 200 > 100) ? 1 : 2; // Walk
+
+        // Determine Row based on CharacterId (Server Slot)
+        const row = typeof p.characterId !== 'undefined' ? p.characterId : 0;
+
+        ctx.save();
+        ctx.translate(p.x + (p.direction === -1 ? p.width : 0), p.y);
+        ctx.scale(p.direction, 1);
+
+        ctx.drawImage(
+            spriteSheet,
+            col * 32, row * 32, 32, 32, // Source
+            0, 0, 32, 32
+        );
         ctx.restore();
 
         // Draw Lives (Local Player Only)
