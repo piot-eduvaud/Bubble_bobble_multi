@@ -346,7 +346,7 @@ class GameRoom {
             // SHOOTING (Moved to Game Loop for Auto-Fire)
             if (p.inputs.shoot) {
                 const now = Date.now();
-                let baseCooldown = (p.fireBuff > 0) ? 200 : 500;
+                let baseCooldown = (p.fireBuff > 0) ? 200 : 800; // PC Slower (0.8s)
                 let bubbleLife = 130; // PC Range slightly reduced (approx screen width)
 
                 // Mobile Nerf (Auto-Fire Balance)
