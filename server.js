@@ -803,16 +803,18 @@ io.on('connection', (socket) => {
 
         if (input.shoot) {
             const now = Date.now();
-            let cooldown = (player.fireBuff > 0) ? 200 : 500;
+            let baseCooldown = (player.fireBuff > 0) ? 200 : 500;
             let bubbleLife = 180;
 
             // Mobile Nerf (Auto-Fire Balance)
             if (player.isMobile) {
-                cooldown = Math.max(cooldown, 800); // Slower fire rate
-                bubbleLife = 60; // Short range
+                // If Candy Active: 400ms (instead of 200ms)
+                // If Normal: 1000ms (instead of 500ms)
+                baseCooldown = (player.fireBuff > 0) ? 400 : 1000;
+                bubbleLife = 30; // Very Short range (approx 1/4 screen)
             }
 
-            if (now - player.lastShoot > cooldown) {
+            if (now - player.lastShoot > baseCooldown) {
                 player.lastShoot = now;
                 currentRoom.bubbles.push({
                     x: player.direction === 1 ? player.x + player.width : player.x - 32,
