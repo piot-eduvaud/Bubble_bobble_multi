@@ -347,12 +347,12 @@ class GameRoom {
             if (p.inputs.shoot) {
                 const now = Date.now();
                 let baseCooldown = (p.fireBuff > 0) ? 200 : 500;
-                let bubbleLife = 180;
+                let bubbleLife = 130; // PC Range slightly reduced (approx screen width)
 
                 // Mobile Nerf (Auto-Fire Balance)
                 if (p.isMobile) {
-                    baseCooldown = (p.fireBuff > 0) ? 400 : 1000; // Slower
-                    bubbleLife = 30; // Short range
+                    baseCooldown = (p.fireBuff > 0) ? 400 : 1000;
+                    bubbleLife = 70; // Mobile Range increased (approx half screen)
                 }
 
                 if (now - p.lastShoot > baseCooldown) {
@@ -362,9 +362,6 @@ class GameRoom {
                         y: p.y, width: 32, height: 32,
                         dx: p.direction * 6, dy: 0, life: bubbleLife, owner: id
                     });
-                    if (p.isMobile) {
-                        // console.log(`Mobile Auto-Fire: CD=${baseCooldown} Life=${bubbleLife}`);
-                    }
                 }
             }
 
