@@ -795,7 +795,6 @@ io.on('connection', (socket) => {
             items: currentRoom.items
         });
         socket.emit('highscores', highScores);
-        socket.emit('debug_info', { isMobile: player.isMobile }); // DEBUG Verification
     });
 
     socket.on('request_highscores', () => {
