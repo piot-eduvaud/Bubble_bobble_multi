@@ -390,16 +390,26 @@ let startX, startY;
 const JOYSTICK_MAX_RADIUS = 40;
 
 if (joystickZone) {
+    // Touch Pressure Logic
+    let baseRadius = 0;
+
     // Shared Logic
-    const handleStart = (clientX, clientY) => {
+    const handleStart = (clientX, clientY, touch = null) => {
         joystickActive = true;
         startX = clientX;
         startY = clientY;
+
+        // Calibrate Pressure/Size
+        if (touch) {
+            baseRadius = touch.radiusX || touch.radiusY || 20; // Default baseline
+            // console.log('Base Radius:', baseRadius, 'Force:', touch.force);
+        }
 
         joystickUI.style.display = 'block';
         joystickUI.style.left = `${startX}px`;
         joystickUI.style.top = `${startY}px`;
         joystickKnob.style.transform = `translate(-50%, -50%)`;
+        joystickKnob.style.background = 'rgba(255, 255, 255, 0.5)'; // Reset color
 
         // Attach global listeners for robust tracking (fixes stutter)
         window.addEventListener('mousemove', onGlobalMove);
@@ -408,7 +418,7 @@ if (joystickZone) {
         window.addEventListener('touchend', onGlobalEnd, { passive: false });
     };
 
-    const handleMove = (clientX, clientY) => {
+    const handleMove = (clientX, clientY, touch = null) => {
         if (!joystickActive) return;
 
         let dx = clientX - startX;
@@ -427,6 +437,23 @@ if (joystickZone) {
         inputs.right = (dx > 10);
         inputs.up = (dy < -30); // Jump if dragged up
 
+        // Pressure Shoot Logic
+        if (touch) {
+            const currentRadius = touch.radiusX || touch.radiusY || baseRadius;
+            const currentForce = touch.force || 0;
+
+            // Thresholds: Force > 0.5 (iPhone "Pop") OR Size > 1.3x (Squishing thumb)
+            const isPressingHard = (currentForce > 0.3) || (currentRadius > baseRadius * 1.3);
+
+            if (isPressingHard) {
+                inputs.shoot = true;
+                joystickKnob.style.background = 'rgba(255, 50, 50, 0.8)'; // Red "Fire" Feedback
+            } else {
+                inputs.shoot = false;
+                joystickKnob.style.background = 'rgba(255, 255, 255, 0.5)';
+            }
+        }
+
         socket.emit('input', inputs);
     };
 
@@ -436,6 +463,7 @@ if (joystickZone) {
         inputs.left = false;
         inputs.right = false;
         inputs.up = false;
+        inputs.shoot = false; // Stop shooting
         socket.emit('input', inputs);
 
         // Remove global listeners
@@ -447,12 +475,18 @@ if (joystickZone) {
 
     // Global wrappers
     const onGlobalMove = (e) => handleMove(e.clientX, e.clientY);
-    const onGlobalTouchMove = (e) => { e.preventDefault(); handleMove(e.changedTouches[0].clientX, e.changedTouches[0].clientY); };
+    const onGlobalTouchMove = (e) => {
+        e.preventDefault();
+        handleMove(e.changedTouches[0].clientX, e.changedTouches[0].clientY, e.changedTouches[0]);
+    };
     const onGlobalEnd = (e) => handleEnd();
 
     // Start Listeners on Zone
     joystickZone.addEventListener('mousedown', (e) => { e.preventDefault(); handleStart(e.clientX, e.clientY); });
-    joystickZone.addEventListener('touchstart', (e) => { e.preventDefault(); handleStart(e.changedTouches[0].clientX, e.changedTouches[0].clientY); }, { passive: false });
+    joystickZone.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        handleStart(e.changedTouches[0].clientX, e.changedTouches[0].clientY, e.changedTouches[0]);
+    }, { passive: false });
 }
 
 // Right Zone (Fire)
