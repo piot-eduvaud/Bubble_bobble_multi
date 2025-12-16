@@ -1,7 +1,10 @@
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+const io = require('socket.io')(http, {
+    pingTimeout: 60000,
+    pingInterval: 25000
+});
 const fs = require('fs');
 const path = require('path');
 
@@ -820,17 +823,41 @@ setInterval(() => {
             const room = rooms[roomName];
 
             room.accumulator += frameTime;
+            let updated = false;
             while (room.accumulator >= room.fixedStep) {
                 room.updatePhysics();
                 room.accumulator -= room.fixedStep;
+                updated = true;
             }
 
-            if (!room.gamePaused) {
+            if (updated && !room.gamePaused) {
+                // Network Optimization: Round values to reduce JSON size
+                const cleanPlayers = {};
+                for (const id in room.players) {
+                    const p = room.players[id];
+                    cleanPlayers[id] = {
+                        ...p,
+                        x: Math.round(p.x),
+                        y: Math.round(p.y),
+                        dx: +p.dx.toFixed(2),
+                        dy: +p.dy.toFixed(2)
+                    };
+                }
+                const cleanBubbles = room.bubbles.map(b => ({
+                    ...b, x: Math.round(b.x), y: Math.round(b.y), dx: +b.dx.toFixed(1), dy: +b.dy.toFixed(1)
+                }));
+                const cleanEnemies = room.enemies.map(e => ({
+                    ...e, x: Math.round(e.x), y: Math.round(e.y), dx: +e.dx.toFixed(1), dy: +e.dy.toFixed(1)
+                }));
+                const cleanItems = room.items.map(i => ({
+                    ...i, x: Math.round(i.x), y: Math.round(i.y)
+                }));
+
                 io.to(roomName).emit('state', {
-                    players: room.players,
-                    bubbles: room.bubbles,
-                    enemies: room.enemies,
-                    items: room.items,
+                    players: cleanPlayers,
+                    bubbles: cleanBubbles,
+                    enemies: cleanEnemies,
+                    items: cleanItems,
                     gamePaused: room.gamePaused
                 });
             }
