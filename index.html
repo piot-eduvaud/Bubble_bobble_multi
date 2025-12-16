@@ -68,6 +68,21 @@
     <div id="highscore-overlay" style="display:none;">
         <div class="highscore-box">
             <h1>🏆 TOP 50 🏆</h1>
+            <div style="display:flex; justify-content:center; gap:5px; margin-bottom:10px; flex-wrap:wrap;">
+                <select id="hs-scope" style="padding:5px;">
+                    <option value="global">Mondial</option>
+                    <option value="room">Salle Actuelle</option>
+                </select>
+                <select id="hs-mode" style="padding:5px;">
+                    <option value="COOP">Co-op</option>
+                    <option value="PVP">Battle Royale</option>
+                    <option value="PVPVE">Chaos</option>
+                </select>
+                <select id="hs-speed" style="padding:5px;">
+                    <option value="slow">Gen X (Lent)</option>
+                    <option value="fast">Gen Z (Rapide)</option>
+                </select>
+            </div>
             <ul id="highscore-list"></ul>
             <button id="close-highscore-btn">FERMER</button>
         </div>

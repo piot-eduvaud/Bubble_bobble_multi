@@ -536,11 +536,60 @@ let lastFinalScore = -1;
 let lastFinalScoreId = null;
 let lastReceivedScores = [];
 
+// High Score Filtering Logic
+const hsScope = document.getElementById('hs-scope');
+const hsMode = document.getElementById('hs-mode');
+const hsSpeed = document.getElementById('hs-speed');
+
+function applyFilters() {
+    renderHighScores(lastReceivedScores);
+}
+
+if (hsScope) hsScope.addEventListener('change', applyFilters);
+if (hsMode) hsMode.addEventListener('change', applyFilters);
+if (hsSpeed) hsSpeed.addEventListener('change', applyFilters);
+
+socket.on('highscores', (scores) => {
+    lastReceivedScores = scores;
+    renderHighScores(scores);
+});
+
 function renderHighScores(scores) {
     highscoreList.innerHTML = '';
     const currentPlayerName = localStorage.getItem('player_name');
+    const scope = hsScope ? hsScope.value : 'global';
+    const mode = hsMode ? hsMode.value : 'COOP';
+    const speed = hsSpeed ? hsSpeed.value : 'slow';
+    const currentRoom = roomInput.value || 'Arcade';
 
-    scores.forEach((s, index) => {
+    let filtered = scores.filter(s => {
+        // Legacy support: if no medatada, assume defaults (Global COOP Slow)
+        // actually if no metadata, show in all? No, hide or defaulting.
+        // Let's assume new records have metadata. Old ones don't.
+        // If s.room_name is null, it's old global data.
+
+        if (scope === 'room') {
+            return s.room_name === currentRoom;
+        } else {
+            // Global: Match Mode & Speed
+            // If data is null (legacy), assume COOP/SLOW? Or just skip?
+            // Skip ensures clean tables.
+            if (!s.game_mode) return false;
+            return s.game_mode === mode && s.speed_mode === speed;
+        }
+    });
+
+    // If Room scope, sort by score desc (db is sort by score desc global, but subset might need resort? No, subset preserves order)
+    // Actually DB returns ordered list. Filter preserves order.
+    // Limit to 50
+    filtered = filtered.slice(0, 50);
+
+    if (filtered.length === 0) {
+        highscoreList.innerHTML = '<li style="color:#888; text-align:center;">Aucun score pour cette catégorie.</li>';
+        return;
+    }
+
+    filtered.forEach((s, index) => {
         const li = document.createElement('li');
         li.innerHTML = `
             <span class="rank">#${index + 1}</span>
@@ -548,12 +597,12 @@ function renderHighScores(scores) {
             <span class="score">${s.score}</span>
         `;
 
-        // Check for highlight (Priority to ID, fallback to Name+Score)
+        // Check for highlight
         let isMatch = false;
         if (lastFinalScoreId && s.id === lastFinalScoreId) {
             isMatch = true;
         } else if (!lastFinalScoreId && lastFinalScore !== -1 && s.score === lastFinalScore && s.name === currentPlayerName) {
-            isMatch = true; // Fallback
+            isMatch = true;
         }
 
         if (isMatch) {

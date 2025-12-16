@@ -35,11 +35,14 @@ if (pool) {
             date TIMESTAMP
         );
     `)
+        .then(() => pool.query('ALTER TABLE highscores ADD COLUMN IF NOT EXISTS game_mode VARCHAR(20)'))
+        .then(() => pool.query('ALTER TABLE highscores ADD COLUMN IF NOT EXISTS speed_mode VARCHAR(20)'))
+        .then(() => pool.query('ALTER TABLE highscores ADD COLUMN IF NOT EXISTS room_name VARCHAR(50)'))
         .then(() => {
-            console.log('Table "highscores" ensured.');
+            console.log('Table "highscores" schema ensured.');
             loadHighScores();
         })
-        .catch(err => console.error('Error creating table:', err));
+        .catch(err => console.error('Error creating/updating table:', err));
 } else {
     console.log('No Database URL found. Using local file system.');
     loadHighScores();
@@ -47,7 +50,7 @@ if (pool) {
 
 function loadHighScores() {
     if (pool) {
-        pool.query('SELECT * FROM highscores ORDER BY score DESC LIMIT 50')
+        pool.query('SELECT * FROM highscores ORDER BY score DESC LIMIT 1000')
             .then(res => {
                 highScores = res.rows;
                 io.emit('highscores', highScores);
@@ -68,29 +71,41 @@ function loadHighScores() {
     }
 }
 
-function updateHighScores(name, score) {
+function updateHighScores(name, score, context = {}) {
     if (score < 0) return null;
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 5); // Unique ID
     const date = new Date().toISOString();
+    const entry = {
+        id,
+        name: name || 'Anonymous',
+        score,
+        date,
+        game_mode: context.mode || null,
+        speed_mode: context.speed || null,
+        room_name: context.room || null
+    };
 
     if (pool) {
-        // Optimistic update for immediate feedback
-        highScores.push({ id, name: name || 'Anonymous', score, date });
+        // Optimistic update
+        highScores.push(entry);
         highScores.sort((a, b) => b.score - a.score);
-        highScores = highScores.slice(0, 50);
+        highScores = highScores.slice(0, 1000); // Keep more in memory for filtering
         io.emit('highscores', highScores);
 
         // Async DB Update
-        pool.query('INSERT INTO highscores (id, name, score, date) VALUES ($1, $2, $3, $4)', [id, name || 'Anonymous', score, date])
+        pool.query(
+            'INSERT INTO highscores (id, name, score, date, game_mode, speed_mode, room_name) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [entry.id, entry.name, entry.score, entry.date, entry.game_mode, entry.speed_mode, entry.room_name]
+        )
             .then(() => {
                 // Refresh to ensure consistency
                 loadHighScores();
             })
             .catch(err => console.error('Error saving score to DB:', err));
     } else {
-        highScores.push({ id: id, name: name || 'Anonymous', score: score, date: date });
+        highScores.push(entry);
         highScores.sort((a, b) => b.score - a.score);
-        highScores = highScores.slice(0, 50); // Keep Top 50
+        highScores = highScores.slice(0, 1000);
         try {
             fs.writeFileSync(HIGHSCORE_FILE, JSON.stringify(highScores, null, 2));
         } catch (err) {
@@ -707,10 +722,20 @@ io.on('connection', (socket) => {
         const mode = (typeof data === 'object') ? data.mode : 'COOP';
         const isPrivate = (typeof data === 'object') ? data.isPrivate : false;
 
-        // Check if room exists and is full
-        if (rooms[roomName] && Object.keys(rooms[roomName].players).length >= MAX_PLAYERS) {
-            socket.emit('join_error', 'La salle est complète (15 joueurs max) !');
-            return;
+        // Check if room exists
+        if (rooms[roomName]) {
+            // Check for duplicate name
+            const nameTaken = Object.values(rooms[roomName].players).some(p => p.name.toLowerCase() === name.toLowerCase());
+            if (nameTaken) {
+                socket.emit('join_error', 'Ce pseudo est déjà pris dans cette salle !');
+                return;
+            }
+
+            // Check if room is full
+            if (Object.keys(rooms[roomName].players).length >= MAX_PLAYERS) {
+                socket.emit('join_error', 'La salle est complète (15 joueurs max) !');
+                return;
+            }
         }
 
         socket.join(roomName);
@@ -799,7 +824,11 @@ io.on('connection', (socket) => {
         if (currentRoom) {
             const p = currentRoom.players[socket.id];
             if (p) {
-                updateHighScores(p.name, p.score);
+                updateHighScores(p.name, p.score, {
+                    room: currentRoom.name,
+                    mode: currentRoom.mode,
+                    speed: currentRoom.speedMode
+                });
                 io.to(socket.id).emit('game_over', p.score);
                 currentRoom.removePlayer(socket.id);
             }
