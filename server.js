@@ -31,9 +31,15 @@ if (pool) {
             score INTEGER,
             date TIMESTAMP
         );
-    `).catch(err => console.error('Error creating table:', err));
+    `)
+        .then(() => {
+            console.log('Table "highscores" ensured.');
+            loadHighScores();
+        })
+        .catch(err => console.error('Error creating table:', err));
 } else {
     console.log('No Database URL found. Using local file system.');
+    loadHighScores();
 }
 
 function loadHighScores() {
@@ -93,7 +99,7 @@ function updateHighScores(name, score) {
 }
 
 // Initial Load
-loadHighScores();
+// loadHighScores(); // Moved to DB Init chain
 
 // Game Constants
 const GRAVITY = 0.5;
