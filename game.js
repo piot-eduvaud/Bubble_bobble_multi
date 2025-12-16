@@ -283,19 +283,33 @@ socket.on('room_list', (rooms) => {
         li.style.cssText = 'padding: 8px; cursor: pointer; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center;';
         li.innerHTML = `
             <span><strong>${r.name}</strong> <span style="font-size:0.7em; color:#aaa;">(${r.mode})</span></span>
-            <span style="background: #333; padding: 2px 5px; border-radius: 4px;">${r.players} 👤</span>
+            <span style="background: #333; padding: 2px 5px; border-radius: 4px;">${r.players}/${r.max || 15} 👤</span>
         `;
         li.addEventListener('mouseenter', () => li.style.background = '#333');
         li.addEventListener('mouseleave', () => li.style.background = 'transparent');
         li.addEventListener('click', () => {
+            // Block full room selection visually or check before join?
+            // Logic allows click, but serve allows reject.
+            // Bonus: Prevent click if full?
+            if (r.players >= (r.max || 15)) {
+                alert('Cette salle est pleine !');
+                return;
+            }
             roomInput.value = r.name;
-            modeInput.value = r.mode; // Optional: Auto-select mode? Or let them join and override?
+            modeInput.value = r.mode;
             // Highlight
             roomInput.style.borderColor = '#0f0';
             setTimeout(() => roomInput.style.borderColor = '', 500);
         });
         roomListUl.appendChild(li);
     });
+});
+
+socket.on('join_error', (msg) => {
+    alert(msg);
+    // Reset UI state if needed, e.g. hide 'quit', show 'login'
+    loginOverlay.style.display = 'flex';
+    document.getElementById('quit-btn').style.display = 'none';
 });
 
 

@@ -669,13 +669,16 @@ class GameRoom {
 const rooms = {}; // Room Map: Name -> GameRoom
 
 // Helper to get active public rooms
+const MAX_PLAYERS = 15;
+
 function getPublicRooms() {
     return Object.values(rooms)
         .filter(r => r.isPublic)
         .map(r => ({
             name: r.name,
             mode: r.mode,
-            players: Object.keys(r.players).length
+            players: Object.keys(r.players).length,
+            max: MAX_PLAYERS
         }));
 }
 
@@ -699,6 +702,12 @@ io.on('connection', (socket) => {
         const speed = (typeof data === 'object') ? data.speed : 'slow';
         const mode = (typeof data === 'object') ? data.mode : 'COOP';
         const isPrivate = (typeof data === 'object') ? data.isPrivate : false;
+
+        // Check if room exists and is full
+        if (rooms[roomName] && Object.keys(rooms[roomName].players).length >= MAX_PLAYERS) {
+            socket.emit('join_error', 'La salle est complète (15 joueurs max) !');
+            return;
+        }
 
         socket.join(roomName);
 
