@@ -722,6 +722,7 @@ io.on('connection', (socket) => {
         const mode = (typeof data === 'object') ? data.mode : 'COOP';
         const isPrivate = (typeof data === 'object') ? data.isPrivate : false;
         const isMobile = (typeof data === 'object') ? data.isMobile : false;
+        console.log(`Join request: ${name}, Room: ${roomName}, Mobile: ${isMobile}`);
 
         // Check if room exists
         if (rooms[roomName]) {

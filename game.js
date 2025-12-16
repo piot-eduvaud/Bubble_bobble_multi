@@ -403,6 +403,9 @@ if (joystickZone) {
         joystickUI.style.top = `${startY}px`;
         joystickKnob.style.transform = `translate(-50%, -50%)`;
 
+        // Reset color (Cyan if Mobile Auto-Fire is active)
+        joystickKnob.style.background = isMobile ? 'rgba(0, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.5)';
+
         // If Mobile, Auto-Fire Enable
         if (isMobile) {
             inputs.shoot = true;
