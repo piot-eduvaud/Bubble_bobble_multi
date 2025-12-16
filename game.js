@@ -401,7 +401,8 @@ if (joystickZone) {
 
         // Calibrate Pressure/Size
         if (touch) {
-            baseRadius = touch.radiusX || touch.radiusY || 20; // Default baseline
+            // Ensure a minimum baseline (15px) to avoid sensitivity spikes on small initial touches
+            baseRadius = Math.max(touch.radiusX || touch.radiusY || 0, 15);
             // console.log('Base Radius:', baseRadius, 'Force:', touch.force);
         }
 
@@ -442,9 +443,8 @@ if (joystickZone) {
             const currentRadius = touch.radiusX || touch.radiusY || baseRadius;
             const currentForce = touch.force || 0;
 
-            // Thresholds: Higher Force (>0.5) or Significant Squish (>1.6x)
-            // Increased thresholds to prevent accidental shooting while moving
-            const isPressingHard = (currentForce > 0.5) || (currentRadius > baseRadius * 1.6);
+            // Thresholds: Very High Force (>0.75) or Double Size (>2.0x)
+            const isPressingHard = (currentForce > 0.75) || (currentRadius > baseRadius * 2.0);
 
             if (isPressingHard) {
                 inputs.shoot = true;
