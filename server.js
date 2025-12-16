@@ -226,7 +226,8 @@ class GameRoom {
             lives: 5,
             shield: 0,
             enemiesKilled: 0,
-            inputs: { left: false, right: false, up: false, shoot: false }
+            inputs: { left: false, right: false, up: false, shoot: false },
+            isMobile: isMobile // Persist the flag
         };
 
         this.players[socketId] = newPlayer;
