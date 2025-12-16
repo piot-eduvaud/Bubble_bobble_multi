@@ -265,7 +265,8 @@ playBtn.addEventListener('click', () => {
     localStorage.setItem('player_name', name);
     loginOverlay.style.display = 'none';
     initAudio();
-    socket.emit('join_game', { name, room, speed, mode, isPrivate });
+    const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    socket.emit('join_game', { name, room, speed, mode, isPrivate, isMobile });
     document.getElementById('quit-btn').style.display = 'block';
 });
 
@@ -388,29 +389,25 @@ const joystickKnob = document.querySelector('.joystick-knob');
 let joystickActive = false;
 let startX, startY;
 const JOYSTICK_MAX_RADIUS = 40;
+const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
 if (joystickZone) {
-    // Touch Pressure Logic
-    let baseRadius = 0;
-
     // Shared Logic
-    const handleStart = (clientX, clientY, touch = null) => {
+    const handleStart = (clientX, clientY) => {
         joystickActive = true;
         startX = clientX;
         startY = clientY;
-
-        // Calibrate Pressure/Size
-        if (touch) {
-            // Ensure a minimum baseline (15px) to avoid sensitivity spikes on small initial touches
-            baseRadius = Math.max(touch.radiusX || touch.radiusY || 0, 15);
-            // console.log('Base Radius:', baseRadius, 'Force:', touch.force);
-        }
 
         joystickUI.style.display = 'block';
         joystickUI.style.left = `${startX}px`;
         joystickUI.style.top = `${startY}px`;
         joystickKnob.style.transform = `translate(-50%, -50%)`;
-        joystickKnob.style.background = 'rgba(255, 255, 255, 0.5)'; // Reset color
+
+        // If Mobile, Auto-Fire Enable
+        if (isMobile) {
+            inputs.shoot = true;
+            socket.emit('input', inputs);
+        }
 
         // Attach global listeners for robust tracking (fixes stutter)
         window.addEventListener('mousemove', onGlobalMove);
@@ -419,7 +416,7 @@ if (joystickZone) {
         window.addEventListener('touchend', onGlobalEnd, { passive: false });
     };
 
-    const handleMove = (clientX, clientY, touch = null) => {
+    const handleMove = (clientX, clientY) => {
         if (!joystickActive) return;
 
         let dx = clientX - startX;
@@ -438,22 +435,7 @@ if (joystickZone) {
         inputs.right = (dx > 10);
         inputs.up = (dy < -30); // Jump if dragged up
 
-        // Pressure Shoot Logic
-        if (touch) {
-            const currentRadius = touch.radiusX || touch.radiusY || baseRadius;
-            const currentForce = touch.force || 0;
-
-            // Thresholds: Very High Force (>0.75) or Double Size (>2.0x)
-            const isPressingHard = (currentForce > 0.75) || (currentRadius > baseRadius * 2.0);
-
-            if (isPressingHard) {
-                inputs.shoot = true;
-                joystickKnob.style.background = 'rgba(255, 50, 50, 0.8)'; // Red "Fire" Feedback
-            } else {
-                inputs.shoot = false;
-                joystickKnob.style.background = 'rgba(255, 255, 255, 0.5)';
-            }
-        }
+        if (isMobile) inputs.shoot = true; // Force Shoot
 
         socket.emit('input', inputs);
     };
@@ -464,7 +446,19 @@ if (joystickZone) {
         inputs.left = false;
         inputs.right = false;
         inputs.up = false;
-        inputs.shoot = false; // Stop shooting
+
+        // Auto-Fire stays active for mobile? 
+        // If we want them to stop shooting when they release joystick, set false.
+        // User said "shoot continuously".
+        // But "vampire survivors" shoots even when stopped.
+        // However, if `join_game` sends `shoot: true` initially? No, inputs init to false.
+        // Let's set it to true if isMobile.
+        if (isMobile) {
+            inputs.shoot = true;
+        } else {
+            inputs.shoot = false;
+        }
+
         socket.emit('input', inputs);
 
         // Remove global listeners
@@ -478,7 +472,7 @@ if (joystickZone) {
     const onGlobalMove = (e) => handleMove(e.clientX, e.clientY);
     const onGlobalTouchMove = (e) => {
         e.preventDefault();
-        handleMove(e.changedTouches[0].clientX, e.changedTouches[0].clientY, e.changedTouches[0]);
+        handleMove(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
     };
     const onGlobalEnd = (e) => handleEnd();
 
@@ -486,7 +480,7 @@ if (joystickZone) {
     joystickZone.addEventListener('mousedown', (e) => { e.preventDefault(); handleStart(e.clientX, e.clientY); });
     joystickZone.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        handleStart(e.changedTouches[0].clientX, e.changedTouches[0].clientY, e.changedTouches[0]);
+        handleStart(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
     }, { passive: false });
 }
 

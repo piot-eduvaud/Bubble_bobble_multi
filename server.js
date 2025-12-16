@@ -193,7 +193,7 @@ class GameRoom {
         }
     }
 
-    addPlayer(socketId, playerName) {
+    addPlayer(socketId, playerName, isMobile = false) {
         let assignedSlot = this.slots.find(s => !s.occupied);
         if (!assignedSlot) {
             // Should not happen due to Max Players check, but safety first
@@ -721,6 +721,7 @@ io.on('connection', (socket) => {
         const speed = (typeof data === 'object') ? data.speed : 'slow';
         const mode = (typeof data === 'object') ? data.mode : 'COOP';
         const isPrivate = (typeof data === 'object') ? data.isPrivate : false;
+        const isMobile = (typeof data === 'object') ? data.isMobile : false;
 
         // Check if room exists
         if (rooms[roomName]) {
@@ -749,7 +750,7 @@ io.on('connection', (socket) => {
         currentRoom = rooms[roomName];
 
         // Add Player
-        const player = currentRoom.addPlayer(socket.id, name);
+        const player = currentRoom.addPlayer(socket.id, name, isMobile);
         if (!player) {
             socket.emit('join_error', 'Impossible de rejoindre : aucun emplacement disponible (erreur interne).');
             return;
@@ -802,13 +803,21 @@ io.on('connection', (socket) => {
 
         if (input.shoot) {
             const now = Date.now();
-            const cooldown = (player.fireBuff > 0) ? 200 : 500;
+            let cooldown = (player.fireBuff > 0) ? 200 : 500;
+            let bubbleLife = 180;
+
+            // Mobile Nerf (Auto-Fire Balance)
+            if (player.isMobile) {
+                cooldown = Math.max(cooldown, 800); // Slower fire rate
+                bubbleLife = 60; // Short range
+            }
+
             if (now - player.lastShoot > cooldown) {
                 player.lastShoot = now;
                 currentRoom.bubbles.push({
                     x: player.direction === 1 ? player.x + player.width : player.x - 32,
                     y: player.y, width: 32, height: 32,
-                    dx: player.direction * 6, dy: 0, life: 180, owner: socket.id
+                    dx: player.direction * 6, dy: 0, life: bubbleLife, owner: socket.id
                 });
             }
         }
