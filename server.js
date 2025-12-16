@@ -12,39 +12,83 @@ app.get('/', (req, res) => {
 });
 
 // High Score System
+const { Pool } = require('pg');
 const HIGHSCORE_FILE = path.join(__dirname, 'highscores.json');
 let highScores = [];
 
-function loadHighScores() {
-    if (fs.existsSync(HIGHSCORE_FILE)) {
-        try {
-            const data = fs.readFileSync(HIGHSCORE_FILE, 'utf8');
-            highScores = JSON.parse(data);
-        } catch (err) {
-            console.error('Error reading highscores:', err);
-            highScores = [];
-        }
-    } else {
-        highScores = [];
-    }
+// Database Connection
+const pool = process.env.DATABASE_URL ? new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+}) : null;
+
+if (pool) {
+    console.log('Connected to PostgreSQL Database');
+    pool.query(`
+        CREATE TABLE IF NOT EXISTS highscores (
+            id VARCHAR(50) PRIMARY KEY,
+            name VARCHAR(50),
+            score INTEGER,
+            date TIMESTAMP
+        );
+    `).catch(err => console.error('Error creating table:', err));
+} else {
+    console.log('No Database URL found. Using local file system.');
 }
 
-function saveHighScores() {
-    try {
-        fs.writeFileSync(HIGHSCORE_FILE, JSON.stringify(highScores, null, 2));
-    } catch (err) {
-        console.error('Error saving highscores:', err);
+function loadHighScores() {
+    if (pool) {
+        pool.query('SELECT * FROM highscores ORDER BY score DESC LIMIT 50')
+            .then(res => {
+                highScores = res.rows;
+                io.emit('highscores', highScores);
+            })
+            .catch(err => console.error('Error loading highscores from DB:', err));
+    } else {
+        if (fs.existsSync(HIGHSCORE_FILE)) {
+            try {
+                const data = fs.readFileSync(HIGHSCORE_FILE, 'utf8');
+                highScores = JSON.parse(data);
+            } catch (err) {
+                console.error('Error reading highscores:', err);
+                highScores = [];
+            }
+        } else {
+            highScores = [];
+        }
     }
 }
 
 function updateHighScores(name, score) {
     if (score < 0) return null;
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 5); // Unique ID
-    highScores.push({ id: id, name: name || 'Anonymous', score: score, date: new Date().toISOString() });
-    highScores.sort((a, b) => b.score - a.score);
-    highScores = highScores.slice(0, 50); // Keep Top 50
-    saveHighScores();
-    io.emit('highscores', highScores); // Broadcast update
+    const date = new Date().toISOString();
+
+    if (pool) {
+        // Optimistic update for immediate feedback
+        highScores.push({ id, name: name || 'Anonymous', score, date });
+        highScores.sort((a, b) => b.score - a.score);
+        highScores = highScores.slice(0, 50);
+        io.emit('highscores', highScores);
+
+        // Async DB Update
+        pool.query('INSERT INTO highscores (id, name, score, date) VALUES ($1, $2, $3, $4)', [id, name || 'Anonymous', score, date])
+            .then(() => {
+                // Refresh to ensure consistency
+                loadHighScores();
+            })
+            .catch(err => console.error('Error saving score to DB:', err));
+    } else {
+        highScores.push({ id: id, name: name || 'Anonymous', score: score, date: date });
+        highScores.sort((a, b) => b.score - a.score);
+        highScores = highScores.slice(0, 50); // Keep Top 50
+        try {
+            fs.writeFileSync(HIGHSCORE_FILE, JSON.stringify(highScores, null, 2));
+        } catch (err) {
+            console.error('Error saving highscores locally:', err);
+        }
+        io.emit('highscores', highScores);
+    }
     return id;
 }
 
