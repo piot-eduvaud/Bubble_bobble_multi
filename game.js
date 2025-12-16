@@ -442,8 +442,9 @@ if (joystickZone) {
             const currentRadius = touch.radiusX || touch.radiusY || baseRadius;
             const currentForce = touch.force || 0;
 
-            // Thresholds: Force > 0.5 (iPhone "Pop") OR Size > 1.3x (Squishing thumb)
-            const isPressingHard = (currentForce > 0.3) || (currentRadius > baseRadius * 1.3);
+            // Thresholds: Higher Force (>0.5) or Significant Squish (>1.6x)
+            // Increased thresholds to prevent accidental shooting while moving
+            const isPressingHard = (currentForce > 0.5) || (currentRadius > baseRadius * 1.6);
 
             if (isPressingHard) {
                 inputs.shoot = true;
@@ -489,19 +490,6 @@ if (joystickZone) {
     }, { passive: false });
 }
 
-// Right Zone (Fire)
-const fireZone = document.getElementById('fire-zone');
-if (fireZone) {
-    const startFire = (e) => { e.preventDefault(); inputs.shoot = true; socket.emit('input', inputs); };
-    const endFire = (e) => { e.preventDefault(); inputs.shoot = false; socket.emit('input', inputs); };
-
-    // Mouse
-    fireZone.addEventListener('mousedown', startFire);
-    fireZone.addEventListener('mouseup', endFire);
-    // Touch
-    fireZone.addEventListener('touchstart', startFire, { passive: false });
-    fireZone.addEventListener('touchend', endFire, { passive: false });
-}
 
 document.addEventListener('keyup', (e) => {
     if (e.code === 'ArrowLeft') inputs.left = false;
