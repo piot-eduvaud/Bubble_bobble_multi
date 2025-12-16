@@ -339,8 +339,33 @@ class GameRoom {
             const currentSpeed = (p.speedBuff > 0) ? 6 : 4;
             if (p.inputs.left) { p.dx = -currentSpeed; p.direction = -1; }
             else if (p.inputs.right) { p.dx = currentSpeed; p.direction = 1; }
-            else { p.dx *= 0.9; }
+            else { p.dx = 0; }
             p.x += p.dx;
+
+            // SHOOTING (Moved to Game Loop for Auto-Fire)
+            if (p.inputs.shoot) {
+                const now = Date.now();
+                let baseCooldown = (p.fireBuff > 0) ? 200 : 500;
+                let bubbleLife = 180;
+
+                // Mobile Nerf (Auto-Fire Balance)
+                if (p.isMobile) {
+                    baseCooldown = (p.fireBuff > 0) ? 400 : 1000; // Slower
+                    bubbleLife = 30; // Short range
+                }
+
+                if (now - p.lastShoot > baseCooldown) {
+                    p.lastShoot = now;
+                    this.bubbles.push({
+                        x: p.direction === 1 ? p.x + p.width : p.x - 32,
+                        y: p.y, width: 32, height: 32,
+                        dx: p.direction * 6, dy: 0, life: bubbleLife, owner: id
+                    });
+                    if (p.isMobile) {
+                        // console.log(`Mobile Auto-Fire: CD=${baseCooldown} Life=${bubbleLife}`);
+                    }
+                }
+            }
 
             // Bounds
             if (p.x < 0) p.x = 0;
@@ -797,32 +822,9 @@ io.on('connection', (socket) => {
 
         player.inputs = input;
 
-        // Logic for Jump/Shoot (Instant actions)
+        // Logic for Jump (Instant action)
         if (input.up && player.grounded) {
             player.dy = -16; player.grounded = false;
-        }
-
-        if (input.shoot) {
-            const now = Date.now();
-            let baseCooldown = (player.fireBuff > 0) ? 200 : 500;
-            let bubbleLife = 180;
-
-            // Mobile Nerf (Auto-Fire Balance)
-            if (player.isMobile) {
-                // If Candy Active: 400ms (instead of 200ms)
-                // If Normal: 1000ms (instead of 500ms)
-                baseCooldown = (player.fireBuff > 0) ? 400 : 1000;
-                bubbleLife = 30; // Very Short range (approx 1/4 screen)
-            }
-
-            if (now - player.lastShoot > baseCooldown) {
-                player.lastShoot = now;
-                currentRoom.bubbles.push({
-                    x: player.direction === 1 ? player.x + player.width : player.x - 32,
-                    y: player.y, width: 32, height: 32,
-                    dx: player.direction * 6, dy: 0, life: bubbleLife, owner: socket.id
-                });
-            }
         }
     });
 
